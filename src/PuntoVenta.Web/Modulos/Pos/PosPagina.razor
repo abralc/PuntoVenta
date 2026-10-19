@@ -1,0 +1,441 @@
+@page "/pos"
+@implements IDisposable
+@inject ApiService Api
+@inject NotificacionService Notificar
+@inject ConfirmacionService Confirmar
+@inject Navegador Navegador
+
+<PageTitle>Punto de venta</PageTitle>
+
+<div class="pv-pos">
+    @* ======================= CATÁLOGO ======================= *@
+    <section class="pv-pos-catalogo">
+        <div class="pv-pos-barra">
+            <div class="input-group">
+                <span class="input-group-text bg-white"><i class="bi bi-upc-scan"></i></span>
+                <input id="posBuscar" type="search" class="form-control" placeholder="Buscar producto o código (P0004)..."
+                       @bind="_buscar" @bind:event="oninput" @bind:after="BuscarConEspera" @onkeydown="TeclaBuscar" autocomplete="off" />
+            </div>
+            <span class="pv-pos-estado d-none d-md-inline-flex" title="La disponibilidad se actualiza cada 5 segundos">
+                <span class="pv-punto @(_conectado ? "ok" : "error")"></span>@(_conectado ? "En línea" : "Sin conexión")
+            </span>
+        </div>
+
+        <div class="pv-pos-marcas" role="tablist" aria-label="Filtrar por marca">
+            <button class="pv-chip @(_idMarca == 0 ? "activo" : "")" @onclick="() => FiltrarMarca(0)">Todas</button>
+            @foreach (var m in _marcas)
+            {
+                <button class="pv-chip @(_idMarca == m.Id ? "activo" : "")" @onclick="() => FiltrarMarca(m.Id)">@m.Texto</button>
+            }
+        </div>
+
+        @if (_productos is null)
+        {
+            <Cargando Texto="Cargando productos..." />
+        }
+        else if (_productos.Count == 0)
+        {
+            <EstadoVacio Icono="bi-search" Texto="No se encontraron productos." />
+        }
+        else
+        {
+            <div class="pv-pos-grid">
+                @foreach (var p in _productos)
+                {
+                    var agotado = p.DisponibleParaMi == 0;
+                    <button type="button" class="pv-pos-item @(agotado ? "agotado" : "") @(p.EnMiTicket > 0 ? "en-ticket" : "")"
+                            disabled="@(p.Restante == 0 || _pendientes.Contains(p.IdProducto))" @onclick="() => Agregar(p)"
+                            title="@(agotado ? "Sin existencia disponible" : $"Agregar {p.Producto}")">
+                        @if (p.EnMiTicket > 0)
+                        {
+                            <span class="pv-pos-badge">@p.EnMiTicket</span>
+                        }
+                        <span class="pv-pos-codigo">@p.Codigo</span>
+                        <img src="@Api.UrlImagen(p.Imagen)" alt="" loading="lazy" />
+                        <span class="pv-pos-nombre">@p.Producto</span>
+                        <span class="pv-pos-marca">@p.Marca</span>
+                        <span class="pv-pos-pie">
+                            <span class="pv-pos-stock @(p.Restante <= 3 ? "bajo" : "")" title="Disponible para esta caja">
+                                @(agotado ? "Agotado" : $"{p.Restante} disp.")
+                            </span>
+                            <span class="pv-pos-precio">@Fmt.Q(p.PrecioVenta)</span>
+                        </span>
+                        @if (p.ReservadoOtros > 0)
+                        {
+                            <span class="pv-pos-reservado"><i class="bi bi-lock-fill"></i> @p.ReservadoOtros en otra caja</span>
+                        }
+                    </button>
+                }
+            </div>
+        }
+    </section>
+
+    @* ======================= TICKET ======================= *@
+    <div class="pv-pos-fondo @(_ticketAbierto ? "visible" : "")" @onclick="() => _ticketAbierto = false"></div>
+
+    <aside class="pv-pos-ticket @(_ticketAbierto ? "abierto" : "")" aria-label="Ticket">
+        <div class="pv-pos-ticket-cabecera">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-receipt-cutoff fs-5 text-primary"></i>
+                <strong>Ticket</strong>
+                @if (_carrito.Lineas.Count > 0)
+                {
+                    <span class="badge rounded-pill text-bg-primary">@_carrito.Unidades</span>
+                }
+            </div>
+            <div class="d-flex align-items-center gap-1">
+                @if (_carrito.Lineas.Count > 0)
+                {
+                    <span class="pv-pos-reloj @(_segundos <= 120 ? "alerta" : "")" title="Tiempo restante de la reserva">
+                        <i class="bi bi-hourglass-split"></i>@Reloj
+                    </span>
+                    <button class="btn btn-sm btn-light" title="Vaciar ticket" @onclick="Vaciar"><i class="bi bi-trash3"></i></button>
+                }
+                <button class="btn btn-sm btn-light d-lg-none" title="Cerrar" @onclick="() => _ticketAbierto = false"><i class="bi bi-chevron-down"></i></button>
+            </div>
+        </div>
+
+        <div class="pv-pos-ticket-datos">
+            <div class="d-flex gap-2 align-items-center">
+                <i class="bi bi-person text-secondary"></i>
+                <select class="form-select form-select-sm" @bind="_idCliente" aria-label="Cliente">
+                    @foreach (var c in _clientes)
+                    {
+                        <option value="@c.Id">@c.Texto</option>
+                    }
+                </select>
+                <a class="btn btn-sm btn-outline-secondary" href="clientes" title="Nuevo cliente"><i class="bi bi-person-plus"></i></a>
+            </div>
+            <div class="d-flex gap-2 align-items-center mt-2">
+                <i class="bi bi-person-badge text-secondary"></i>
+                <select class="form-select form-select-sm" @bind="_idEmpleado" aria-label="Empleado">
+                    <option value="0">-- Empleado --</option>
+                    @foreach (var e in _empleados)
+                    {
+                        <option value="@e.Id">@e.Texto</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <div class="pv-pos-lineas">
+            @if (_carrito.Lineas.Count == 0)
+            {
+                <div class="text-center text-secondary py-5 px-3">
+                    <i class="bi bi-cart3 fs-1 d-block opacity-50"></i>
+                    <div class="small mt-2">Toque un producto para agregarlo.<br />Queda reservado para esta caja por @_minutosReserva minutos.</div>
+                </div>
+            }
+            @foreach (var l in _carrito.Lineas)
+            {
+                <div class="pv-pos-linea">
+                    <img src="@Api.UrlImagen(l.Imagen)" alt="" />
+                    <div class="pv-pos-linea-info">
+                        <div class="pv-pos-linea-nombre" title="@l.Producto">@l.Producto</div>
+                        <div class="small text-secondary">@Fmt.Q(l.PrecioVenta) c/u</div>
+                    </div>
+                    <div class="pv-pos-cantidad">
+                        <button class="btn btn-sm btn-light" @onclick="() => Cambiar(l.IdProducto, l.Cantidad - 1)" disabled="@_pendientes.Contains(l.IdProducto)" aria-label="Menos"><i class="bi bi-dash"></i></button>
+                        <span>@l.Cantidad</span>
+                        <button class="btn btn-sm btn-light" @onclick="() => Cambiar(l.IdProducto, l.Cantidad + 1)" disabled="@(l.Cantidad >= l.Maximo || _pendientes.Contains(l.IdProducto))" aria-label="Más"><i class="bi bi-plus"></i></button>
+                    </div>
+                    <div class="pv-pos-linea-total">
+                        <strong>@Fmt.Q(l.Subtotal)</strong>
+                        <button class="btn btn-link btn-sm text-danger p-0" @onclick="() => Cambiar(l.IdProducto, 0)">Quitar</button>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="pv-pos-ticket-pie">
+            <div class="d-flex justify-content-between small text-secondary"><span>Artículos</span><span>@_carrito.Unidades</span></div>
+            <div class="d-flex justify-content-between align-items-baseline pv-pos-total"><span>TOTAL</span><strong>@Fmt.Q(_carrito.Total)</strong></div>
+            <button class="btn btn-primary btn-lg w-100 mt-2" disabled="@(_carrito.Lineas.Count == 0 || _cobrando)" @onclick="AbrirCobro">
+                <i class="bi bi-cash-coin me-2"></i>Cobrar @Fmt.Q(_carrito.Total)
+            </button>
+        </div>
+    </aside>
+
+    @* ======================= BARRA MÓVIL ======================= *@
+    <button class="pv-pos-barra-movil d-lg-none" @onclick="() => _ticketAbierto = true">
+        <span><i class="bi bi-cart3 me-2"></i>Ver ticket <span class="badge text-bg-light ms-1">@_carrito.Unidades</span></span>
+        <strong>@Fmt.Q(_carrito.Total)</strong>
+    </button>
+</div>
+
+@* ======================= COBRO ======================= *@
+<Modal @bind-Visible="_modalCobro" Titulo="Cobrar" Icono="bi-cash-coin" Tamano="" PantallaCompletaEnMovil="false">
+    <ChildContent>
+        <div class="pv-calculo mb-3">
+            <div><span>Cliente</span><strong class="text-end">@_clientes.FirstOrDefault(c => c.Id == _idCliente)?.Texto</strong></div>
+            <div><span>Artículos</span><strong>@_carrito.Unidades</strong></div>
+            <div class="total"><span>Total a pagar</span><strong>@Fmt.Q(_carrito.Total)</strong></div>
+        </div>
+        <label class="form-label" for="efectivo">Efectivo recibido</label>
+        <div class="input-group input-group-lg">
+            <span class="input-group-text">Q</span>
+            <input id="efectivo" type="number" step="0.01" min="0" class="form-control" @bind="_efectivo" @bind:event="oninput" />
+        </div>
+        <div class="d-flex flex-wrap gap-2 mt-2">
+            @foreach (var b in Billetes)
+            {
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => _efectivo = b">Q @b</button>
+            }
+            <button class="btn btn-sm btn-outline-primary" @onclick="() => _efectivo = _carrito.Total">Exacto</button>
+        </div>
+        <div class="d-flex justify-content-between align-items-baseline mt-3 fs-5">
+            <span>Cambio</span>
+            <strong class="@(Faltante > 0 ? "text-danger" : "text-success")">
+                @(Faltante > 0 ? $"Faltan {Fmt.Q(Faltante)}" : Fmt.Q(Cambio))
+            </strong>
+        </div>
+    </ChildContent>
+    <Pie>
+        <button class="btn btn-light" @onclick="() => _modalCobro = false">Cancelar</button>
+        <button class="btn btn-success" disabled="@(_cobrando || Faltante > 0)" @onclick="Cobrar">
+            @if (_cobrando)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+            }
+            <i class="bi bi-check2-circle me-1"></i>Confirmar venta
+        </button>
+    </Pie>
+</Modal>
+
+@* ======================= VENTA REALIZADA ======================= *@
+<Modal @bind-Visible="_modalTicket" Titulo="Venta realizada" Icono="bi-check-circle" Tamano="" PantallaCompletaEnMovil="false">
+    <ChildContent>
+        <FacturaImpresion Venta="_ventaRealizada" EfectivoRecibido="_efectivoVenta" />
+    </ChildContent>
+    <Pie>
+        <button class="btn btn-outline-primary" @onclick="() => Navegador.ImprimirTicketAsync()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+        <button class="btn btn-primary" @onclick="NuevaVenta"><i class="bi bi-plus-lg me-1"></i>Nueva venta</button>
+    </Pie>
+</Modal>
+
+@code {
+    private const string ClaveSesion = "pv_pos_sesion";
+    private static readonly decimal[] Billetes = [50, 100, 200, 500];
+
+    [CascadingParameter] private Task<AuthenticationState>? EstadoAuth { get; set; }
+
+    private string _sesion = string.Empty;
+    private List<PosProductoDto>? _productos;
+    private PosCarritoDto _carrito = new();
+    private List<OpcionDto> _marcas = [], _clientes = [], _empleados = [];
+    private readonly HashSet<int> _pendientes = [];
+    private int _idMarca, _idCliente, _idEmpleado;
+    private string _buscar = string.Empty;
+    private int _segundos, _minutosReserva = 15;
+    private decimal? _efectivo, _efectivoVenta;
+    private VentaDto? _ventaRealizada;
+    private bool _ticketAbierto, _modalCobro, _modalTicket, _cobrando, _conectado = true;
+
+    private readonly CancellationTokenSource _cts = new();
+    private CancellationTokenSource? _esperaBusqueda;
+    private PeriodicTimer? _reloj;
+
+    private string Reloj => $"{_segundos / 60:00}:{_segundos % 60:00}";
+    private decimal Faltante => _efectivo is decimal e && e > 0 && e < _carrito.Total ? _carrito.Total - e : 0;
+    private decimal Cambio => _efectivo is decimal e && e > _carrito.Total ? e - _carrito.Total : 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Cada pestaña del navegador es una caja distinta (sessionStorage).
+        // Al recargar la página se recupera el mismo ticket.
+        _sesion = await Navegador.LeerSesionAsync(ClaveSesion) ?? string.Empty;
+        if (!Guid.TryParse(_sesion, out _))
+        {
+            _sesion = Guid.NewGuid().ToString();
+            await Navegador.GuardarSesionAsync(ClaveSesion, _sesion);
+        }
+
+        try
+        {
+            _marcas = await Api.GetAsync<List<OpcionDto>>("api/marcas/opciones") ?? [];
+            _clientes = await Api.GetAsync<List<OpcionDto>>("api/clientes/opciones") ?? [];
+            _empleados = await Api.GetAsync<List<OpcionDto>>("api/empleados/opciones") ?? [];
+            _minutosReserva = (await Api.GetAsync<PuntoVenta.Shared.Configuracion.ConfiguracionDto>("api/configuracion"))?.MinutosReservaPos ?? 15;
+        }
+        catch (ApiException ex) { Notificar.Error(ex.Message); }
+
+        _idCliente = _clientes.FirstOrDefault()?.Id ?? 0;   // CF primero
+        if (EstadoAuth is not null && int.TryParse((await EstadoAuth).User.FindFirst("id_empleado")?.Value, out var idEmpleado))
+            _idEmpleado = idEmpleado;
+
+        await CargarProductos();
+        await CargarCarrito();
+        _ = CicloAsync();
+    }
+
+    /// <summary>Cada segundo: cuenta regresiva de la reserva. Cada 5 s: disponibilidad de otras cajas.</summary>
+    private async Task CicloAsync()
+    {
+        _reloj = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        var tick = 0;
+        try
+        {
+            while (await _reloj.WaitForNextTickAsync(_cts.Token))
+            {
+                tick++;
+                if (_carrito.Lineas.Count > 0 && _segundos > 0)
+                {
+                    _segundos--;
+                    if (_segundos == 0)
+                    {
+                        await CargarCarrito();
+                        Notificar.Advertencia("La reserva del ticket venció y los productos se liberaron.");
+                    }
+                }
+                if (tick % 5 == 0) await CargarProductos(silencioso: true);
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task CargarProductos(bool silencioso = false)
+    {
+        try
+        {
+            var url = $"api/pos/productos?sesion={_sesion}&buscar={Uri.EscapeDataString(_buscar)}" + (_idMarca > 0 ? $"&idMarca={_idMarca}" : "");
+            _productos = await Api.GetAsync<List<PosProductoDto>>(url) ?? [];
+            _conectado = true;
+        }
+        catch (ApiException ex)
+        {
+            _conectado = false;
+            _productos ??= [];
+            if (!silencioso) Notificar.Error(ex.Message);
+        }
+    }
+
+    private async Task CargarCarrito()
+    {
+        try
+        {
+            _carrito = await Api.GetAsync<PosCarritoDto>($"api/pos/carrito/{_sesion}") ?? new();
+            _segundos = _carrito.SegundosRestantes;
+        }
+        catch (ApiException ex) { Notificar.Error(ex.Message); }
+    }
+
+    private async Task BuscarConEspera()
+    {
+        _esperaBusqueda?.Cancel();
+        _esperaBusqueda = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, _esperaBusqueda.Token);
+            await CargarProductos();
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    /// <summary>Enter en el buscador: si hay un solo resultado (o un código exacto), se agrega directo.</summary>
+    private async Task TeclaBuscar(KeyboardEventArgs e)
+    {
+        if (e.Key != "Enter") return;
+        _esperaBusqueda?.Cancel();
+        await CargarProductos();
+        if (_productos is { Count: 1 } && _productos[0].Restante > 0)
+        {
+            await Agregar(_productos[0]);
+            _buscar = string.Empty;
+            await CargarProductos();
+        }
+    }
+
+    private Task FiltrarMarca(int idMarca)
+    {
+        _idMarca = idMarca;
+        return CargarProductos();
+    }
+
+    private Task Agregar(PosProductoDto p) => Cambiar(p.IdProducto, p.EnMiTicket + 1);
+
+    /// <summary>Fija la cantidad del producto en el ticket (0 = quitar). La API valida y reserva.</summary>
+    private async Task Cambiar(int idProducto, int cantidad)
+    {
+        if (cantidad < 0 || !_pendientes.Add(idProducto)) return;
+        try
+        {
+            _carrito = await Api.PutAsync<PosReservaDto, PosCarritoDto>("api/pos/reservas",
+                           new PosReservaDto { Sesion = _sesion, IdProducto = idProducto, Cantidad = cantidad }) ?? new();
+            _segundos = _carrito.SegundosRestantes;
+
+            // Reflejar el cambio en la tarjeta sin esperar el siguiente refresco
+            if (_productos?.FirstOrDefault(x => x.IdProducto == idProducto) is { } p)
+                p.EnMiTicket = _carrito.Lineas.FirstOrDefault(l => l.IdProducto == idProducto)?.Cantidad ?? 0;
+        }
+        catch (ApiException ex)
+        {
+            Notificar.Advertencia(ex.Message);
+            await CargarProductos(silencioso: true);
+        }
+        finally { _pendientes.Remove(idProducto); }
+    }
+
+    private async Task Vaciar()
+    {
+        if (!await Confirmar.PreguntarAsync("Vaciar ticket", "¿Quitar todos los productos? Las reservas se liberarán para las demás cajas.", "Sí, vaciar")) return;
+        try
+        {
+            await Api.DeleteAsync($"api/pos/carrito/{_sesion}");
+            _carrito = new();
+            _segundos = 0;
+            await CargarProductos();
+        }
+        catch (ApiException ex) { Notificar.Error(ex.Message); }
+    }
+
+    private void AbrirCobro()
+    {
+        if (_idCliente <= 0) { Notificar.Advertencia("Seleccione un cliente."); return; }
+        if (_idEmpleado <= 0) { Notificar.Advertencia("Seleccione el empleado que atiende."); return; }
+        _efectivo = null;
+        _modalCobro = true;
+    }
+
+    private async Task Cobrar()
+    {
+        _cobrando = true;
+        try
+        {
+            _ventaRealizada = await Api.PostAsync<PosCobrarDto, VentaDto>("api/pos/cobrar",
+                new PosCobrarDto { Sesion = _sesion, IdCliente = _idCliente, IdEmpleado = _idEmpleado });
+            _efectivoVenta = _efectivo;
+            _modalCobro = false;
+            _ticketAbierto = false;
+            _modalTicket = true;
+            Notificar.Exito($"Venta {_ventaRealizada?.Factura} registrada por {Fmt.Q(_ventaRealizada?.Total ?? 0)}.");
+            _carrito = new();
+            _segundos = 0;
+            await CargarProductos();
+        }
+        catch (ApiException ex)
+        {
+            Notificar.Error(ex.Message);
+            await CargarCarrito();
+            await CargarProductos(silencioso: true);
+        }
+        finally { _cobrando = false; }
+    }
+
+    private async Task NuevaVenta()
+    {
+        _modalTicket = false;
+        _ventaRealizada = null;
+        _idCliente = _clientes.FirstOrDefault()?.Id ?? 0;
+        await Navegador.EnfocarAsync("posBuscar");
+    }
+
+    public void Dispose()
+    {
+        // Las reservas NO se liberan al salir: si vuelve a esta pestaña recupera su ticket.
+        // Si no regresa, vencen solas después de los minutos configurados.
+        _cts.Cancel();
+        _reloj?.Dispose();
+        _esperaBusqueda?.Cancel();
+    }
+}
