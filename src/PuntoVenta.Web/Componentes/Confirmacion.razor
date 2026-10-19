@@ -1,0 +1,33 @@
+@implements IDisposable
+@inject ConfirmacionService Confirmar
+
+@if (Confirmar.Visible)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title">
+                        <i class="bi @(Confirmar.EsPeligroso ? "bi-exclamation-triangle text-danger" : "bi-question-circle text-primary") me-2"></i>
+                        @Confirmar.Titulo
+                    </h5>
+                    <button type="button" class="btn-close" aria-label="Cerrar" @onclick="() => Confirmar.Responder(false)"></button>
+                </div>
+                <div class="modal-body">@Confirmar.Mensaje</div>
+                <div class="modal-footer border-0 pt-0">
+                    <button class="btn btn-light" @onclick="() => Confirmar.Responder(false)">Cancelar</button>
+                    <button class="btn @(Confirmar.EsPeligroso ? "btn-danger" : "btn-primary")" @onclick="() => Confirmar.Responder(true)">
+                        @Confirmar.TextoAceptar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    protected override void OnInitialized() => Confirmar.Cambio += Refrescar;
+    private void Refrescar() => InvokeAsync(StateHasChanged);
+    public void Dispose() => Confirmar.Cambio -= Refrescar;
+}

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>PuntoVenta.Web</RootNamespace>
+    <!-- .NET 10: reemplaza #[.{fingerprint}] e importmap de index.html al compilar/publicar -->
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.8" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.8" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PuntoVenta.Shared\PuntoVenta.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- No recortar el ensamblado de la app al publicar: Inicio busca componentes de módulos por nombre -->
+    <TrimmerRootAssembly Include="PuntoVenta.Web" />
+  </ItemGroup>
+
+</Project>

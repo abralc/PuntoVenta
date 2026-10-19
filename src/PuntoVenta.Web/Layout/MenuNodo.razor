@@ -1,0 +1,56 @@
+@* Nodo recursivo del menú: se dibuja a sí mismo para cada nivel de subopciones
+   (Ventas → Empleados → Puestos = 3 niveles). *@
+
+<ul class="pv-nav-lista nivel-@Nivel">
+    @foreach (var item in Items)
+    {
+        var tieneHijos = item.Hijos.Count > 0;
+        var abierto = !_cerrados.Contains(item.Id);
+
+        <li>
+            <div class="pv-nav-fila">
+                @if (!string.IsNullOrEmpty(item.Url))
+                {
+                    <NavLink class="pv-nav-link" href="@Ruta(item.Url)" Match="@(item.Url == "/" ? NavLinkMatch.All : NavLinkMatch.Prefix)"
+                             @onclick="AlNavegar">
+                        <i class="bi @(item.Icono ?? "bi-dot")"></i><span>@item.Nombre</span>
+                    </NavLink>
+                }
+                else
+                {
+                    <span class="pv-nav-link pv-nav-grupo" @onclick="() => Alternar(item.Id)">
+                        <i class="bi @(item.Icono ?? "bi-folder")"></i><span>@item.Nombre</span>
+                    </span>
+                }
+
+                @if (tieneHijos)
+                {
+                    <button type="button" class="pv-nav-toggle" @onclick="() => Alternar(item.Id)"
+                            aria-label="@(abierto ? "Contraer" : "Expandir") @item.Nombre">
+                        <i class="bi @(abierto ? "bi-chevron-down" : "bi-chevron-right")"></i>
+                    </button>
+                }
+            </div>
+
+            @if (tieneHijos && abierto)
+            {
+                <MenuNodo Items="item.Hijos" Nivel="Nivel + 1" AlNavegar="AlNavegar" />
+            }
+        </li>
+    }
+</ul>
+
+@code {
+    [Parameter, EditorRequired] public List<MenuItemDto> Items { get; set; } = [];
+    [Parameter] public int Nivel { get; set; }
+    [Parameter] public EventCallback AlNavegar { get; set; }
+
+    private readonly HashSet<int> _cerrados = [];
+
+    private void Alternar(int id)
+    {
+        if (!_cerrados.Remove(id)) _cerrados.Add(id);
+    }
+
+    private static string Ruta(string url) => url == "/" ? "" : url.TrimStart('/');
+}

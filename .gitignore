@@ -1,0 +1,62 @@
+# =====================================================================
+#  .gitignore único para todo el equipo (.NET 10 / Visual Studio / VS Code)
+#  Lo que cada integrante sube lo controlan los scripts de scripts/git,
+#  NO este archivo.
+# =====================================================================
+
+# Compilación
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ll]og/
+[Ll]ogs/
+artifacts/
+publish/
+*.pubxml.user
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.rsuser
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+
+# NuGet
+*.nupkg
+*.snupkg
+**/packages/*
+!**/packages/build/
+project.lock.json
+project.fragment.lock.json
+
+# Pruebas y cobertura
+TestResults/
+[Tt]est[Rr]esult*/
+coverage*.json
+coverage*.xml
+*.coverage
+
+# Sistema operativo
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Imágenes de productos subidas en tiempo de ejecución (se generan en el servidor)
+src/PuntoVenta.Api/wwwroot/images/productos/*
+!src/PuntoVenta.Api/wwwroot/images/productos/.gitkeep
+
+# Secretos locales (si alguien crea su propio archivo de configuración)
+appsettings.Local.json
+*.secrets.json

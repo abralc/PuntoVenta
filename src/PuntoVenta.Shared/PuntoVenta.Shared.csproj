@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Modelos compartidos (DTOs) entre la API y Blazor.
+    Las DataAnnotations de estos DTOs validan en ambos lados:
+      - Blazor:  <DataAnnotationsValidator />
+      - API:     [ApiController] responde 400 automáticamente
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>PuntoVenta.Shared</RootNamespace>
+  </PropertyGroup>
+
+</Project>

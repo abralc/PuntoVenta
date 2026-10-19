@@ -1,0 +1,24 @@
+@* Título de pantalla con icono, descripción y botones a la derecha. *@
+<div class="pv-encabezado-pagina">
+    <div class="d-flex align-items-center gap-3 me-auto">
+        <span class="pv-icono-pagina"><i class="bi @Icono"></i></span>
+        <div>
+            <h1>@Titulo</h1>
+            @if (!string.IsNullOrEmpty(Descripcion))
+            {
+                <div class="text-secondary small">@Descripcion</div>
+            }
+        </div>
+    </div>
+    @if (Acciones is not null)
+    {
+        <div class="d-flex flex-wrap gap-2">@Acciones</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Titulo { get; set; } = string.Empty;
+    [Parameter] public string Icono { get; set; } = "bi-grid";
+    [Parameter] public string? Descripcion { get; set; }
+    [Parameter] public RenderFragment? Acciones { get; set; }
+}

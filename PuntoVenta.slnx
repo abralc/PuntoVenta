@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PuntoVenta.Shared/PuntoVenta.Shared.csproj" />
+    <Project Path="src/PuntoVenta.Api/PuntoVenta.Api.csproj" />
+    <Project Path="src/PuntoVenta.Web/PuntoVenta.Web.csproj" />
+  </Folder>
+  <Folder Name="/database/">
+    <File Path="database/01_esquema.sql" />
+    <File Path="database/02_datos_semilla.sql" />
+    <File Path="database/03_usuario_aplicacion.sql" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
+    <File Path=".gitattributes" />
+    <File Path="README.md" />
+  </Folder>
+</Solution>

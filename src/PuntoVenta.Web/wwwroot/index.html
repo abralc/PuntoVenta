@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Punto de Venta</title>
+    <link rel="preload" id="webassembly" />
+    <base href="/" />
+    <!-- Bootstrap 5 y Bootstrap Icons locales: funcionan sin internet en la red del laboratorio -->
+    <link rel="stylesheet" href="lib/bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="lib/bootstrap-icons/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <script type="importmap"></script>
+</head>
+
+<body>
+    <div id="app">
+        <div class="pv-pantalla-carga">
+            <span class="pv-logo pv-logo-lg"><i class="bi bi-shop-window"></i></span>
+            <div class="spinner-border text-primary mt-3" role="status"></div>
+            <p class="mt-2 text-secondary">Cargando Punto de Venta...</p>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui">
+        Ocurrió un error inesperado.
+        <a href="." class="reload">Recargar</a>
+        <span class="dismiss">✕</span>
+    </div>
+
+    <script src="lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="js/app.js"></script>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+</body>
+
+</html>

@@ -1,0 +1,40 @@
+@inject ApiService Api
+
+@* Menú principal DINÁMICO: las opciones vienen de la tabla "menu" vía GET /api/menu
+   (API del módulo Seguridad). Está en Layout para que la base compile por sí sola.
+   No hay ninguna opción escrita en el código. *@
+
+<nav class="pv-nav">
+    @if (_menu is null)
+    {
+        <div class="px-3 py-2 small opacity-75"><span class="spinner-border spinner-border-sm me-2"></span>Cargando menú...</div>
+    }
+    else if (_menu.Count == 0)
+    {
+        <div class="px-3 py-2 small opacity-75">@(_error ?? "Sin opciones asignadas a su rol.")</div>
+    }
+    else
+    {
+        <MenuNodo Items="_menu" Nivel="0" AlNavegar="AlNavegar" />
+    }
+</nav>
+
+@code {
+    [Parameter] public EventCallback AlNavegar { get; set; }
+
+    private List<MenuItemDto>? _menu;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _menu = await Api.GetAsync<List<MenuItemDto>>("api/menu") ?? [];
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+            _menu = [];
+        }
+    }
+}

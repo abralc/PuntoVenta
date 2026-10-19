@@ -1,0 +1,32 @@
+@implements IDisposable
+@inject NotificacionService Notificar
+
+<div class="toast-container position-fixed top-0 end-0 p-3 pv-toasts">
+    @foreach (var n in Notificar.Activas)
+    {
+        <div class="toast show align-items-center border-0 pv-toast pv-toast-@n.Tipo.ToString().ToLowerInvariant()" role="alert">
+            <div class="d-flex">
+                <div class="toast-body d-flex align-items-start gap-2">
+                    <i class="bi @Icono(n.Tipo) fs-5"></i>
+                    <span>@n.Mensaje</span>
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" aria-label="Cerrar"
+                        @onclick="() => Notificar.Cerrar(n.Id)"></button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized() => Notificar.Cambio += Refrescar;
+    private void Refrescar() => InvokeAsync(StateHasChanged);
+    public void Dispose() => Notificar.Cambio -= Refrescar;
+
+    private static string Icono(TipoNotificacion tipo) => tipo switch
+    {
+        TipoNotificacion.Exito => "bi-check-circle-fill",
+        TipoNotificacion.Error => "bi-x-octagon-fill",
+        TipoNotificacion.Advertencia => "bi-exclamation-triangle-fill",
+        _ => "bi-info-circle-fill"
+    };
+}

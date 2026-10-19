@@ -1,0 +1,376 @@
+/* =====================================================================
+   Punto de Venta · estilos globales (sobre Bootstrap 5)
+   Paleta: azul de marca + barra lateral azul noche + fondo gris claro
+   ===================================================================== */
+
+:root {
+    --pv-primario: #1f6feb;
+    --pv-primario-oscuro: #1554c0;
+    --pv-sidebar: #0f1d36;
+    --pv-sidebar-texto: #b8c4d9;
+    --pv-sidebar-activo: #1f6feb;
+    --pv-fondo: #f3f5f9;
+    --pv-borde: #e3e8f0;
+    --pv-ancho-sidebar: 264px;
+    --bs-primary: #1f6feb;
+    --bs-primary-rgb: 31, 111, 235;
+    --bs-link-color: #1f6feb;
+    --bs-link-color-rgb: 31, 111, 235;
+    --bs-body-font-family: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+html, body { height: 100%; }
+body { background: var(--pv-fondo); color: #1d2635; }
+
+.btn-primary {
+    --bs-btn-bg: var(--pv-primario);
+    --bs-btn-border-color: var(--pv-primario);
+    --bs-btn-hover-bg: var(--pv-primario-oscuro);
+    --bs-btn-hover-border-color: var(--pv-primario-oscuro);
+    --bs-btn-active-bg: var(--pv-primario-oscuro);
+    --bs-btn-disabled-bg: var(--pv-primario);
+    --bs-btn-disabled-border-color: var(--pv-primario);
+}
+
+/* ---------- Pantalla de carga inicial ---------- */
+.pv-pantalla-carga {
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+
+/* ---------- Logo ---------- */
+.pv-logo {
+    width: 40px; height: 40px; border-radius: 12px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--pv-primario); color: #fff; font-size: 1.25rem; flex-shrink: 0;
+}
+.pv-logo-lg { width: 64px; height: 64px; border-radius: 18px; font-size: 2rem; }
+
+/* ---------- Estructura principal ---------- */
+.pv-app { display: flex; min-height: 100vh; }
+
+.pv-sidebar {
+    width: var(--pv-ancho-sidebar);
+    background: var(--pv-sidebar);
+    color: var(--pv-sidebar-texto);
+    position: fixed; inset: 0 auto 0 0;
+    overflow-y: auto;
+    z-index: 1040;
+    transition: transform .2s ease;
+}
+
+.pv-brand {
+    display: flex; align-items: center; gap: .75rem;
+    padding: 1.25rem 1.25rem 1rem;
+    color: #fff; text-decoration: none;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.pv-brand small { color: var(--pv-sidebar-texto); font-size: .75rem; }
+.pv-brand:hover { color: #fff; }
+
+.pv-main { flex: 1; margin-left: var(--pv-ancho-sidebar); min-width: 0; display: flex; flex-direction: column; }
+
+.pv-topbar {
+    position: sticky; top: 0; z-index: 1020;
+    display: flex; align-items: center; gap: .75rem;
+    padding: .75rem 1.5rem;
+    background: #fff; border-bottom: 1px solid var(--pv-borde);
+}
+
+.pv-content { padding: 1.5rem; flex: 1; }
+
+.pv-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #e7efff; color: var(--pv-primario); font-weight: 700; font-size: .85rem;
+}
+
+.pv-backdrop { display: none; }
+
+@media (max-width: 991.98px) {
+    .pv-sidebar { transform: translateX(-100%); }
+    .pv-main { margin-left: 0; }
+    .menu-abierto .pv-sidebar { transform: translateX(0); }
+    .menu-abierto .pv-backdrop {
+        display: block; position: fixed; inset: 0; background: rgba(15, 29, 54, .45); z-index: 1030;
+    }
+    .pv-content { padding: 1rem; }
+    .pv-topbar { padding: .6rem 1rem; }
+}
+
+/* ---------- Menú dinámico ---------- */
+.pv-nav { padding: .75rem .6rem 2rem; }
+.pv-nav-lista { list-style: none; margin: 0; padding: 0; }
+.pv-nav-lista.nivel-1 { margin-left: .9rem; border-left: 1px solid rgba(255,255,255,.08); padding-left: .35rem; }
+.pv-nav-lista.nivel-2 { margin-left: .9rem; border-left: 1px solid rgba(255,255,255,.08); padding-left: .35rem; }
+
+.pv-nav-fila { display: flex; align-items: center; }
+
+.pv-nav-link {
+    flex: 1;
+    display: flex; align-items: center; gap: .65rem;
+    padding: .55rem .75rem; margin: 1px 0;
+    border-radius: .55rem;
+    color: var(--pv-sidebar-texto); text-decoration: none; font-size: .925rem;
+    cursor: pointer;
+}
+.pv-nav-link i { font-size: 1.05rem; width: 1.2rem; text-align: center; }
+.pv-nav-link:hover { background: rgba(255,255,255,.06); color: #fff; }
+.pv-nav-link.active { background: var(--pv-sidebar-activo); color: #fff; box-shadow: 0 4px 12px rgba(31,111,235,.35); }
+.nivel-1 .pv-nav-link, .nivel-2 .pv-nav-link { font-size: .875rem; padding-top: .45rem; padding-bottom: .45rem; }
+
+.pv-nav-toggle {
+    background: transparent; border: 0; color: var(--pv-sidebar-texto);
+    width: 32px; height: 32px; border-radius: .5rem;
+}
+.pv-nav-toggle:hover { background: rgba(255,255,255,.08); color: #fff; }
+
+/* ---------- Login ---------- */
+.pv-login-fondo {
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 1rem;
+    background:
+        radial-gradient(circle at 15% 20%, rgba(31,111,235,.25), transparent 40%),
+        radial-gradient(circle at 85% 80%, rgba(31,111,235,.18), transparent 45%),
+        var(--pv-sidebar);
+}
+.pv-login-card { width: 100%; max-width: 420px; border-radius: 1.25rem; }
+
+/* ---------- Inicio ---------- */
+.pv-bienvenida {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.5rem 1.75rem; border-radius: 1rem;
+    background: linear-gradient(120deg, var(--pv-primario), #4f8ff7);
+    color: #fff;
+}
+
+.pv-acceso {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem;
+    padding: 1.25rem .75rem; height: 100%;
+    background: #fff; border: 1px solid var(--pv-borde); border-radius: .9rem;
+    color: #1d2635; text-decoration: none; text-align: center; font-weight: 500;
+    transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+.pv-acceso i { font-size: 1.75rem; color: var(--pv-primario); }
+.pv-acceso:hover { transform: translateY(-2px); border-color: #bcd2fb; box-shadow: 0 8px 20px rgba(31,111,235,.12); color: #1d2635; }
+
+/* ---------- Componentes reutilizables para los módulos ---------- */
+.pv-card { background: #fff; border: 1px solid var(--pv-borde); border-radius: .9rem; }
+.pv-card-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--pv-borde); }
+.pv-card-body { padding: 1.25rem; }
+
+.pv-encabezado-pagina { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-bottom: 1.25rem; }
+.pv-encabezado-pagina h1 { font-size: 1.4rem; margin: 0; font-weight: 700; }
+
+.table > :not(caption) > * > * { padding: .7rem .85rem; }
+.table thead th { font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; color: #66748a; background: #f8fafc; }
+
+.pv-miniatura { width: 48px; height: 48px; object-fit: cover; border-radius: .5rem; border: 1px solid var(--pv-borde); background: #fff; }
+
+/* ---------- Toasts ---------- */
+.pv-toasts { z-index: 1090; }
+.pv-toast { color: #fff; min-width: 280px; box-shadow: 0 10px 24px rgba(0,0,0,.15); }
+.pv-toast-exito { background: #198754; }
+.pv-toast-error { background: #dc3545; }
+.pv-toast-advertencia { background: #c27c0e; }
+.pv-toast-info { background: var(--pv-primario); }
+
+/* ---------- Errores de validación de Blazor ---------- */
+.valid.modified:not([type=checkbox]) { outline: 1px solid #26b050; }
+.invalid { outline: 1px solid #e50000; }
+.validation-message { color: #dc3545; font-size: .85rem; }
+
+/* ---------- Error global de Blazor ---------- */
+#blazor-error-ui {
+    background: #fff3cd; bottom: 0; box-shadow: 0 -1px 2px rgba(0,0,0,.2);
+    display: none; left: 0; padding: .6rem 1.25rem .7rem; position: fixed; width: 100%; z-index: 2000;
+}
+#blazor-error-ui .dismiss { cursor: pointer; position: absolute; right: .75rem; top: .5rem; }
+
+/* =====================================================================
+   Componentes de pantallas (fase 2)
+   ===================================================================== */
+.pv-icono-pagina {
+    width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #e7efff; color: var(--pv-primario); font-size: 1.3rem;
+}
+.pv-ancho-buscador { flex: 1 1 280px; max-width: 460px; }
+.pv-buscador .form-control:focus { box-shadow: none; }
+.pv-clic { cursor: pointer; }
+.pv-nav-grupo { cursor: pointer; }
+.pv-sticky { position: sticky; top: 80px; }
+.pv-modal .modal-header { border-bottom-color: var(--pv-borde); }
+.pv-modal .modal-footer { border-top-color: var(--pv-borde); }
+
+/* Tarjetas de producto (vista cuadrícula) */
+.pv-producto-tarjeta { background: #fff; border: 1px solid var(--pv-borde); border-radius: .75rem; overflow: hidden; }
+.pv-producto-tarjeta img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #f1f4f9; cursor: zoom-in; }
+
+/* Editor de imagen */
+.pv-imagen-editor { border: 2px dashed var(--pv-borde); border-radius: .75rem; overflow: hidden; background: #f8fafc; }
+.pv-imagen-editor img { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; display: block; }
+
+/* Bloques de cálculo y totales */
+.pv-calculo > div { display: flex; justify-content: space-between; gap: 1rem; padding: .45rem 0; border-bottom: 1px dashed var(--pv-borde); }
+.pv-calculo > div.total { border-bottom: 0; font-size: 1.2rem; color: var(--pv-primario); }
+.pv-total-bloque { display: flex; flex-direction: column; padding: .25rem 1rem; border-left: 3px solid var(--pv-borde); }
+.pv-total-bloque span { font-size: .78rem; color: #66748a; text-transform: uppercase; }
+.pv-total-bloque strong { font-size: 1.15rem; }
+.pv-total-principal { border-left-color: var(--pv-primario); }
+.pv-total-principal strong { font-size: 1.5rem; color: var(--pv-primario); }
+
+/* Reportes */
+.pv-reporte-tarjeta { gap: .35rem; padding: 1.5rem 1rem; }
+.pv-reporte-tarjeta small { font-size: .78rem; }
+
+/* Indicadores del inicio */
+.pv-kpi {
+    display: flex; align-items: center; gap: .9rem; height: 100%;
+    background: #fff; border: 1px solid var(--pv-borde); border-radius: .9rem; padding: 1rem; color: inherit;
+}
+.pv-kpi > div { display: flex; flex-direction: column; min-width: 0; }
+.pv-kpi small { color: #66748a; font-size: .78rem; }
+.pv-kpi strong { font-size: 1.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pv-kpi-icono { width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; }
+
+.pv-barras { display: flex; align-items: flex-end; gap: .6rem; height: 200px; padding-top: 1.2rem; }
+.pv-barra { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: .3rem; min-width: 0; }
+.pv-barra-relleno { width: 100%; max-width: 46px; background: linear-gradient(180deg, #4f8ff7, var(--pv-primario)); border-radius: .4rem .4rem 0 0; transition: height .4s ease; }
+.pv-barra-valor { font-size: .68rem; color: #66748a; white-space: nowrap; }
+.pv-barra-etiqueta { font-size: .75rem; color: #66748a; }
+
+/* =====================================================================
+   POS · Punto de venta (escritorio: catálogo + ticket; móvil: ticket deslizable)
+   ===================================================================== */
+.pv-pos {
+    display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 1rem;
+    height: calc(100vh - 61px - 3rem);
+}
+.pv-pos-catalogo { display: flex; flex-direction: column; min-height: 0; }
+.pv-pos-barra { display: flex; align-items: center; gap: .75rem; margin-bottom: .75rem; }
+.pv-pos-estado { align-items: center; gap: .4rem; font-size: .8rem; color: #66748a; white-space: nowrap; }
+.pv-punto { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.pv-punto.ok { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.2); }
+.pv-punto.error { background: #ef4444; }
+
+.pv-pos-marcas { display: flex; gap: .5rem; overflow-x: auto; padding-bottom: .5rem; margin-bottom: .5rem; scrollbar-width: thin; }
+.pv-chip {
+    flex-shrink: 0; border: 1px solid var(--pv-borde); background: #fff; color: #1d2635;
+    border-radius: 999px; padding: .35rem .9rem; font-size: .85rem;
+}
+.pv-chip:hover { border-color: #bcd2fb; }
+.pv-chip.activo { background: var(--pv-primario); border-color: var(--pv-primario); color: #fff; }
+
+.pv-pos-grid {
+    flex: 1; overflow-y: auto; min-height: 0; padding: .25rem .25rem 1rem;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .85rem; align-content: start;
+}
+.pv-pos-item {
+    position: relative; display: flex; flex-direction: column; align-items: stretch; text-align: left;
+    background: #fff; border: 1px solid var(--pv-borde); border-radius: .9rem; padding: .7rem;
+    transition: transform .1s ease, box-shadow .1s ease, border-color .1s ease;
+}
+.pv-pos-item:hover:not(:disabled) { transform: translateY(-2px); border-color: #bcd2fb; box-shadow: 0 8px 20px rgba(31,111,235,.12); }
+.pv-pos-item:active:not(:disabled) { transform: scale(.98); }
+.pv-pos-item:disabled { cursor: not-allowed; }
+.pv-pos-item.agotado { opacity: .55; }
+.pv-pos-item.en-ticket { border-color: var(--pv-primario); box-shadow: 0 0 0 2px rgba(31,111,235,.15); }
+.pv-pos-codigo { font-size: .7rem; color: #66748a; text-align: center; letter-spacing: .03em; }
+.pv-pos-item img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: .6rem; margin: .35rem 0 .5rem; background: #f1f4f9; }
+.pv-pos-nombre {
+    font-weight: 700; font-size: .82rem; text-transform: uppercase; text-align: center; line-height: 1.2;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.4em;
+}
+.pv-pos-marca { font-size: .72rem; color: #66748a; text-align: center; margin-bottom: .5rem; }
+.pv-pos-pie { display: flex; justify-content: space-between; align-items: center; gap: .3rem; margin-top: auto; }
+.pv-pos-stock, .pv-pos-precio { border-radius: .4rem; padding: .15rem .45rem; font-size: .76rem; font-weight: 600; white-space: nowrap; }
+.pv-pos-stock { background: #e6f7ef; color: #13795b; }
+.pv-pos-stock.bajo { background: #fff4de; color: #9a6400; }
+.pv-pos-item.agotado .pv-pos-stock { background: #fde8e8; color: #b42318; }
+.pv-pos-precio { background: var(--pv-primario); color: #fff; }
+.pv-pos-reservado { font-size: .7rem; color: #9a6400; text-align: center; margin-top: .35rem; }
+.pv-pos-badge {
+    position: absolute; top: -8px; right: -8px; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 13px;
+    background: var(--pv-primario); color: #fff; font-weight: 700; font-size: .8rem;
+    display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 3px 8px rgba(31,111,235,.4);
+}
+
+/* Ticket */
+.pv-pos-ticket {
+    display: flex; flex-direction: column; min-height: 0;
+    background: #fff; border: 1px solid var(--pv-borde); border-radius: 1rem; overflow: hidden;
+}
+.pv-pos-ticket-cabecera { display: flex; justify-content: space-between; align-items: center; padding: .8rem 1rem; border-bottom: 1px solid var(--pv-borde); }
+.pv-pos-reloj { font-size: .8rem; font-variant-numeric: tabular-nums; color: #66748a; display: inline-flex; gap: .25rem; align-items: center; margin-right: .25rem; }
+.pv-pos-reloj.alerta { color: #b42318; font-weight: 600; }
+.pv-pos-ticket-datos { padding: .75rem 1rem; border-bottom: 1px solid var(--pv-borde); background: #f8fafc; }
+.pv-pos-lineas { flex: 1; overflow-y: auto; min-height: 0; }
+.pv-pos-linea { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-areas: "img info total" "img cant total"; gap: .2rem .6rem; padding: .7rem 1rem; border-bottom: 1px solid #f0f2f6; align-items: center; }
+.pv-pos-linea img { grid-area: img; width: 44px; height: 44px; object-fit: cover; border-radius: .5rem; background: #f1f4f9; }
+.pv-pos-linea-info { grid-area: info; min-width: 0; }
+.pv-pos-linea-nombre { font-weight: 600; font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pv-pos-cantidad { grid-area: cant; display: inline-flex; align-items: center; gap: .35rem; }
+.pv-pos-cantidad span { min-width: 1.8rem; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pv-pos-cantidad .btn { width: 30px; height: 30px; padding: 0; border-radius: 50%; }
+.pv-pos-linea-total { grid-area: total; display: flex; flex-direction: column; align-items: flex-end; font-size: .9rem; }
+.pv-pos-ticket-pie { padding: .9rem 1rem 1rem; border-top: 1px solid var(--pv-borde); background: #f8fafc; }
+.pv-pos-total span { font-weight: 600; color: #66748a; }
+.pv-pos-total strong { font-size: 1.7rem; color: var(--pv-primario); font-variant-numeric: tabular-nums; }
+.pv-pos-fondo, .pv-pos-barra-movil { display: none; }
+
+@media (max-width: 991.98px) {
+    .pv-pos { display: block; height: auto; }
+    .pv-pos-grid { overflow: visible; padding-bottom: 5.5rem; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .65rem; }
+    .pv-pos-ticket {
+        position: fixed; left: 0; right: 0; bottom: 0; height: 88vh; z-index: 1036;
+        border-radius: 1.25rem 1.25rem 0 0; border: 0; box-shadow: 0 -10px 30px rgba(15,29,54,.25);
+        transform: translateY(105%); transition: transform .25s ease;
+    }
+    .pv-pos-ticket.abierto { transform: translateY(0); }
+    .pv-pos-ticket-cabecera::before {
+        content: ""; position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
+        width: 42px; height: 4px; border-radius: 2px; background: #d3d9e3;
+    }
+    .pv-pos-ticket-cabecera { position: relative; padding-top: 1.1rem; }
+    .pv-pos-fondo.visible { display: block; position: fixed; inset: 0; background: rgba(15,29,54,.45); z-index: 1035; }
+    .pv-pos-barra-movil {
+        display: flex; justify-content: space-between; align-items: center;
+        position: fixed; left: .75rem; right: .75rem; bottom: .75rem; z-index: 1030;
+        padding: .9rem 1.1rem; border: 0; border-radius: .9rem;
+        background: var(--pv-primario); color: #fff; font-size: 1rem; box-shadow: 0 8px 24px rgba(31,111,235,.45);
+    }
+}
+
+/* =====================================================================
+   Ticket / factura imprimible (80 mm) e impresión de reportes
+   ===================================================================== */
+.pv-ticket {
+    font-family: "Consolas", "Courier New", monospace; font-size: .85rem; color: #111;
+    max-width: 320px; margin: 0 auto; padding: 1rem; background: #fff; border: 1px dashed #c9cfd8; border-radius: .5rem;
+}
+.pv-ticket hr { margin: .5rem 0; border-top: 1px dashed #333; opacity: 1; }
+.pv-ticket-titulo { font-weight: 700; font-size: 1rem; }
+.pv-ticket-total { font-weight: 700; font-size: 1.05rem; }
+.pv-ticket th { font-weight: 600; border-bottom: 1px dashed #333; }
+.pv-solo-impresion { display: none; }
+
+@media print {
+    @page { margin: 10mm; }
+    body { background: #fff !important; }
+    .pv-sidebar, .pv-topbar, .pv-backdrop, .pv-toasts, .pv-no-imprimir, #blazor-error-ui,
+    .pv-pos-barra-movil, .pv-pos-fondo { display: none !important; }
+    .pv-main { margin-left: 0 !important; }
+    .pv-content { padding: 0 !important; }
+    .pv-card { border: 0 !important; }
+    .table-responsive { overflow: visible !important; }
+
+    /* Si en la pantalla hay un ticket, solo se imprime el ticket */
+    body:has(.pv-imprimible) * { visibility: hidden; }
+    body:has(.pv-imprimible) .pv-imprimible,
+    body:has(.pv-imprimible) .pv-imprimible * { visibility: visible; }
+    .pv-imprimible { display: block !important; position: absolute; left: 0; top: 0; width: 80mm; max-width: 80mm; border: 0; padding: 0; }
+    .modal, .modal-dialog, .modal-content, .modal-body { position: static !important; transform: none !important; overflow: visible !important; }
+    .modal-backdrop { display: none !important; }
+}

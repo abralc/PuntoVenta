@@ -1,0 +1,144 @@
+@page "/configuracion"
+@attribute [Authorize(Roles = "Administrador")]
+@using PuntoVenta.Shared.Configuracion
+@inject ApiService Api
+@inject NotificacionService Notificar
+@inject ConfirmacionService Confirmar
+
+<PageTitle>Configuración · Punto de Venta</PageTitle>
+
+<EncabezadoPagina Titulo="Configuración" Icono="bi-sliders"
+                  Descripcion="Parámetros generales del sistema. Solo el administrador puede modificarlos." />
+
+@if (_datos is null)
+{
+    <Cargando />
+}
+else
+{
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="pv-card">
+                <div class="pv-card-header fw-semibold"><i class="bi bi-gear me-2"></i>Parámetros</div>
+                <div class="pv-card-body">
+                    <AlertaErrores Error="_error" />
+                    <EditForm Model="_datos" OnValidSubmit="Guardar" id="frmConfiguracion">
+                        <DataAnnotationsValidator />
+
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold" for="porcentaje">Porcentaje de ganancia sobre el costo</label>
+                            <div class="input-group" style="max-width: 220px">
+                                <InputNumber id="porcentaje" class="form-control" @bind-Value="_datos.PorcentajeGanancia" step="0.01" />
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <ValidationMessage For="() => _datos.PorcentajeGanancia" />
+                            <div class="form-text">
+                                Regla del enunciado: <strong>precio de venta = precio de costo + 25 %</strong>.
+                                Se aplica automáticamente en cada compra.
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-sm-4">
+                                <label class="form-label" for="serie">Serie de factura</label>
+                                <InputText id="serie" class="form-control text-uppercase" maxlength="1" @bind-Value="_datos.SerieFactura" />
+                                <ValidationMessage For="() => _datos.SerieFactura" />
+                            </div>
+                            <div class="col-sm-4">
+                                <label class="form-label" for="minutos">Reserva en POS (min)</label>
+                                <InputNumber id="minutos" class="form-control" @bind-Value="_datos.MinutosReservaPos" />
+                                <ValidationMessage For="() => _datos.MinutosReservaPos" />
+                            </div>
+                            <div class="col-sm-4">
+                                <label class="form-label" for="minima">Existencia mínima</label>
+                                <InputNumber id="minima" class="form-control" @bind-Value="_datos.ExistenciaMinima" />
+                                <ValidationMessage For="() => _datos.ExistenciaMinima" />
+                            </div>
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary" disabled="@_guardando">
+                                @if (_guardando)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                }
+                                <i class="bi bi-check2-circle me-1"></i>Guardar cambios
+                            </button>
+                            <button type="button" class="btn btn-outline-primary" @onclick="Recalcular" disabled="@_guardando">
+                                <i class="bi bi-arrow-repeat me-1"></i>Recalcular precios de todos los productos
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="pv-card h-100">
+                <div class="pv-card-header fw-semibold"><i class="bi bi-calculator me-2"></i>Vista previa del cálculo</div>
+                <div class="pv-card-body">
+                    <label class="form-label" for="costoEjemplo">Precio de costo de ejemplo</label>
+                    <div class="input-group mb-3">
+                        <span class="input-group-text">Q</span>
+                        <input id="costoEjemplo" type="number" step="0.01" min="0" class="form-control" @bind="_costoEjemplo" @bind:event="oninput" />
+                    </div>
+                    <div class="pv-calculo">
+                        <div><span>Precio de costo</span><strong>@Fmt.Q(_costoEjemplo)</strong></div>
+                        <div><span>+ @_datos.PorcentajeGanancia.ToString("0.##") %</span><strong>@Fmt.Q(PrecioVenta - _costoEjemplo)</strong></div>
+                        <div class="total"><span>Precio de venta</span><strong>@Fmt.Q(PrecioVenta)</strong></div>
+                    </div>
+                    <p class="small text-secondary mt-3 mb-0">
+                        El cambio de porcentaje se aplica en las <strong>siguientes compras</strong>. Use
+                        "Recalcular precios" para aplicarlo de inmediato a los productos existentes.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private ConfiguracionDto? _datos;
+    private ApiException? _error;
+    private bool _guardando;
+    private decimal _costoEjemplo = 100m;
+
+    private decimal PrecioVenta =>
+        Math.Round(_costoEjemplo * (1 + (_datos?.PorcentajeGanancia ?? 0) / 100m), 2, MidpointRounding.AwayFromZero);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _datos = await Api.GetAsync<ConfiguracionDto>("api/configuracion"); }
+        catch (ApiException ex) { Notificar.Error(ex.Message); _datos = new(); }
+    }
+
+    private async Task Guardar()
+    {
+        _guardando = true; _error = null;
+        try
+        {
+            _datos!.SerieFactura = _datos.SerieFactura.ToUpperInvariant();
+            _datos = await Api.PutAsync<ConfiguracionDto, ConfiguracionDto>("api/configuracion", _datos);
+            Notificar.Exito("Configuración guardada.");
+        }
+        catch (ApiException ex) { _error = ex; }
+        finally { _guardando = false; }
+    }
+
+    private async Task Recalcular()
+    {
+        if (!await Confirmar.PreguntarAsync("Recalcular precios",
+                $"Se actualizará el precio de venta de TODOS los productos con el {_datos!.PorcentajeGanancia:0.##} % guardado. ¿Continuar?",
+                "Sí, recalcular", esPeligroso: false))
+            return;
+
+        _guardando = true;
+        try
+        {
+            var r = await Api.PostAsync<object, RecalculoPreciosDto>("api/configuracion/recalcular-precios", new { });
+            Notificar.Exito($"Se actualizaron {r?.ProductosActualizados ?? 0} productos con {r?.PorcentajeAplicado:0.##} %.");
+        }
+        catch (ApiException ex) { Notificar.Error(ex.Message); }
+        finally { _guardando = false; }
+    }
+}

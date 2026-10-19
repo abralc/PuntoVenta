@@ -1,0 +1,76 @@
+@page "/"
+@inject ApiService Api
+
+<PageTitle>Inicio · Punto de Venta</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="pv-bienvenida mb-4">
+            <div>
+                <h1 class="h3 mb-1">¡Hola, @Primero(context.User.Identity?.Name)!</h1>
+                <p class="mb-0 opacity-75">Rol: @context.User.FindFirst("role")?.Value · Sesión válida hasta @Expira(context.User)</p>
+            </div>
+            <i class="bi bi-shop display-5 opacity-50 d-none d-md-block"></i>
+        </div>
+    </Authorized>
+</AuthorizeView>
+
+@* Indicadores del módulo Reportes. Se busca por nombre para que la base compile aunque
+   ese módulo todavía no esté integrado en el repositorio. *@
+@if (TipoResumen is not null)
+{
+    <DynamicComponent Type="TipoResumen" />
+}
+
+<h2 class="h6 text-uppercase text-secondary mb-3">Accesos rápidos</h2>
+
+@if (_accesos is null)
+{
+    <Cargando />
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var item in _accesos)
+        {
+            <div class="col-6 col-md-4 col-xl-3">
+                <a class="pv-acceso" href="@(item.Url!.TrimStart('/'))">
+                    <i class="bi @item.Icono"></i>
+                    <span>@item.Nombre</span>
+                </a>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<MenuItemDto>? _accesos;
+
+    private static readonly Type? TipoResumen =
+        typeof(Inicio).Assembly.GetType("PuntoVenta.Web.Modulos.Reportes.ResumenInicio");
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Los accesos rápidos también salen del menú dinámico (base de datos)
+            var menu = await Api.GetAsync<List<MenuItemDto>>("api/menu") ?? [];
+            _accesos = Aplanar(menu).Where(m => !string.IsNullOrEmpty(m.Url) && m.Url != "/").ToList();
+        }
+        catch
+        {
+            _accesos = [];
+        }
+    }
+
+    private static IEnumerable<MenuItemDto> Aplanar(IEnumerable<MenuItemDto> items) =>
+        items.SelectMany(i => new[] { i }.Concat(Aplanar(i.Hijos)));
+
+    private static string Primero(string? nombre) =>
+        nombre?.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
+
+    private static string Expira(System.Security.Claims.ClaimsPrincipal user) =>
+        long.TryParse(user.FindFirst("exp")?.Value, out var s)
+            ? DateTimeOffset.FromUnixTimeSeconds(s).ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+            : "-";
+}

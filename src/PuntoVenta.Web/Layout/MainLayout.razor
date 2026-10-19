@@ -1,0 +1,67 @@
+@inherits LayoutComponentBase
+@inject JwtAuthStateProvider Auth
+@inject NavigationManager Nav
+
+<div class="pv-app @(_menuAbierto ? "menu-abierto" : "")">
+
+    <aside class="pv-sidebar">
+        <a class="pv-brand" href="">
+            <span class="pv-logo"><i class="bi bi-shop-window"></i></span>
+            <span>
+                <span class="d-block fw-bold">Punto de Venta</span>
+                <small>Programación · UMG</small>
+            </span>
+        </a>
+        <MenuDinamico AlNavegar="() => _menuAbierto = false" />
+    </aside>
+
+    <div class="pv-backdrop" @onclick="() => _menuAbierto = false"></div>
+
+    <div class="pv-main">
+        <header class="pv-topbar">
+            <button class="btn btn-light d-lg-none" @onclick="() => _menuAbierto = !_menuAbierto" aria-label="Menú">
+                <i class="bi bi-list fs-5"></i>
+            </button>
+            <EstadoServidor />
+            <div class="flex-grow-1"></div>
+            <AuthorizeView>
+                <Authorized>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="pv-avatar">@Iniciales(context.User.Identity?.Name)</span>
+                        <span class="d-none d-sm-block lh-sm">
+                            <span class="d-block fw-semibold small">@context.User.Identity?.Name</span>
+                            <span class="badge text-bg-primary-subtle text-primary-emphasis">@context.User.FindFirst("role")?.Value</span>
+                        </span>
+                        <button class="btn btn-outline-secondary btn-sm ms-2" @onclick="CerrarSesion" title="Cerrar sesión">
+                            <i class="bi bi-box-arrow-right"></i><span class="d-none d-md-inline ms-1">Salir</span>
+                        </button>
+                    </div>
+                </Authorized>
+            </AuthorizeView>
+        </header>
+
+        <main class="pv-content">
+            @Body
+        </main>
+    </div>
+</div>
+
+<Toasts />
+<Confirmacion />
+
+@code {
+    private bool _menuAbierto;
+
+    private async Task CerrarSesion()
+    {
+        await Auth.CerrarSesionAsync();
+        Nav.NavigateTo("login");
+    }
+
+    private static string Iniciales(string? nombre)
+    {
+        if (string.IsNullOrWhiteSpace(nombre)) return "?";
+        var partes = nombre.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(partes.Take(2).Select(p => char.ToUpperInvariant(p[0])));
+    }
+}

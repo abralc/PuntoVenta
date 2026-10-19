@@ -1,0 +1,32 @@
+@inject ApiService Api
+
+@* Indicador de conexión con la API y MySQL. Útil para demostrar el acceso en red local. *@
+@if (_cargando)
+{
+    <span class="badge rounded-pill text-bg-light"><span class="spinner-border spinner-border-sm me-1"></span>Verificando servidor...</span>
+}
+else if (_estado is null)
+{
+    <span class="badge rounded-pill text-bg-danger" title="@_error"><i class="bi bi-wifi-off me-1"></i>API sin conexión</span>
+}
+else
+{
+    <span class="badge rounded-pill @(_estado.BaseDatosConectada ? "text-bg-success" : "text-bg-warning")"
+          title="Servidor @_estado.Servidor · @Api.UrlBase">
+        <i class="bi @(_estado.BaseDatosConectada ? "bi-hdd-network" : "bi-database-exclamation") me-1"></i>
+        @(_estado.BaseDatosConectada ? $"Conectado a {_estado.Servidor}" : "API activa, MySQL sin conexión")
+    </span>
+}
+
+@code {
+    private EstadoServidorDto? _estado;
+    private bool _cargando = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _estado = await Api.GetAsync<EstadoServidorDto>("api/estado"); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _cargando = false; }
+    }
+}

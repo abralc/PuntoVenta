@@ -1,0 +1,47 @@
+@* Ventana modal reutilizable.
+   Para un formulario: <EditForm id="frmX" ...> dentro del cuerpo y en el Pie
+   <button type="submit" form="frmX">Guardar</button> *@
+
+@if (Visible)
+{
+    <div class="modal fade show d-block pv-modal" tabindex="-1" role="dialog" aria-modal="true" @onkeydown="Tecla">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable @Tamano @(PantallaCompletaEnMovil ? "modal-fullscreen-sm-down" : "")">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        @if (!string.IsNullOrEmpty(Icono))
+                        {
+                            <i class="bi @Icono text-primary me-2"></i>
+                        }
+                        @Titulo
+                    </h5>
+                    <button type="button" class="btn-close" aria-label="Cerrar" @onclick="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    @ChildContent
+                </div>
+                @if (Pie is not null)
+                {
+                    <div class="modal-footer">@Pie</div>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter] public string Titulo { get; set; } = string.Empty;
+    [Parameter] public string? Icono { get; set; }
+    /// <summary>modal-sm, modal-lg, modal-xl o vacío.</summary>
+    [Parameter] public string Tamano { get; set; } = "modal-lg";
+    [Parameter] public bool PantallaCompletaEnMovil { get; set; } = true;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Pie { get; set; }
+
+    private Task Cerrar() => VisibleChanged.InvokeAsync(false);
+
+    private Task Tecla(KeyboardEventArgs e) => e.Key == "Escape" ? Cerrar() : Task.CompletedTask;
+}

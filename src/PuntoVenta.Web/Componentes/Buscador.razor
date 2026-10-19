@@ -1,0 +1,42 @@
+@implements IDisposable
+
+@* Caja de búsqueda: espera 350 ms después de la última tecla para buscar. *@
+<div class="input-group pv-buscador">
+    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+    <input type="search" class="form-control border-start-0" placeholder="@Placeholder" aria-label="@Placeholder"
+           @bind="Valor" @bind:event="oninput" @bind:after="Escribio" />
+    @if (!string.IsNullOrEmpty(Valor))
+    {
+        <button class="btn btn-outline-secondary" type="button" title="Limpiar" @onclick="Limpiar"><i class="bi bi-x-lg"></i></button>
+    }
+</div>
+
+@code {
+    [Parameter] public string Placeholder { get; set; } = "Buscar...";
+    [Parameter] public EventCallback<string> AlBuscar { get; set; }
+
+    private string Valor { get; set; } = string.Empty;
+    private CancellationTokenSource? _espera;
+
+    private async Task Escribio()
+    {
+        _espera?.Cancel();
+        _espera = new CancellationTokenSource();
+        var token = _espera.Token;
+        try
+        {
+            await Task.Delay(350, token);
+            await AlBuscar.InvokeAsync(Valor.Trim());
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private async Task Limpiar()
+    {
+        _espera?.Cancel();
+        Valor = string.Empty;
+        await AlBuscar.InvokeAsync(string.Empty);
+    }
+
+    public void Dispose() => _espera?.Cancel();
+}
