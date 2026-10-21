@@ -1,0 +1,387 @@
+@page "/productos"
+@using PuntoVenta.Shared.Configuracion
+@inject ApiService Api
+@inject NotificacionService Notificar
+@inject ConfirmacionService Confirmar
+
+<PageTitle>Productos · Punto de Venta</PageTitle>
+
+<EncabezadoPagina Titulo="Productos" Icono="bi-box-seam" Descripcion="Catálogo de productos con imagen, precios y existencia.">
+    <Acciones>
+        <a class="btn btn-outline-secondary" href="marcas"><i class="bi bi-tags me-1"></i>Administrar marcas</a>
+        <button class="btn btn-primary" @onclick="Nuevo"><i class="bi bi-plus-lg me-1"></i>Nuevo producto</button>
+    </Acciones>
+</EncabezadoPagina>
+
+<div class="pv-card">
+    <div class="pv-card-header d-flex flex-wrap gap-2 align-items-center">
+        <div class="pv-ancho-buscador"><Buscador Placeholder="Buscar por producto, descripción o marca..." AlBuscar="Buscar" /></div>
+        <select class="form-select w-auto" @bind="_filtroMarca" @bind:after="Cargar" aria-label="Filtrar por marca">
+            <option value="0">Todas las marcas</option>
+            @foreach (var m in _marcas)
+            {
+                <option value="@m.Id">@m.Texto</option>
+            }
+        </select>
+        <div class="btn-group ms-auto" role="group" aria-label="Vista">
+            <button class="btn btn-outline-secondary @(_vistaTarjetas ? "" : "active")" title="Tabla" @onclick="() => _vistaTarjetas = false"><i class="bi bi-list-ul"></i></button>
+            <button class="btn btn-outline-secondary @(_vistaTarjetas ? "active" : "")" title="Tarjetas" @onclick="() => _vistaTarjetas = true"><i class="bi bi-grid-3x3-gap"></i></button>
+        </div>
+    </div>
+
+    @if (_lista is null)
+    {
+        <Cargando />
+    }
+    else if (_lista.Count == 0)
+    {
+        <EstadoVacio Icono="bi-box-seam" Texto="No se encontraron productos." />
+    }
+    else if (_vistaTarjetas)
+    {
+        <div class="row g-3 p-3">
+            @foreach (var p in _lista.Skip((_pagina - 1) * TamanoPagina).Take(TamanoPagina))
+            {
+                <div class="col-6 col-md-4 col-xl-3">
+                    <div class="pv-producto-tarjeta h-100">
+                        <img src="@Api.UrlImagen(p.Imagen)" alt="@p.Producto" loading="lazy" @onclick="() => VerImagen(p)" />
+                        <div class="p-2">
+                            <div class="small text-secondary">@p.Marca</div>
+                            <div class="fw-semibold text-truncate" title="@p.Producto">@p.Producto</div>
+                            <div class="d-flex justify-content-between align-items-center mt-1">
+                                <span class="fw-bold text-primary">@Fmt.Q(p.PrecioVenta)</span>
+                                <span class="badge @ClaseExistencia(p.Existencia)">@p.Existencia u.</span>
+                            </div>
+                            <div class="d-flex gap-1 mt-2">
+                                <button class="btn btn-sm btn-outline-primary flex-fill" @onclick="() => Editar(p)"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-danger flex-fill" @onclick="() => Eliminar(p)"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+        <Paginacion Total="_lista.Count" @bind-Pagina="_pagina" TamanoPagina="TamanoPagina" />
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="width:64px">Imagen</th><th>Producto</th><th>Marca</th>
+                        <th class="text-end">Costo</th><th class="text-end">Venta</th><th class="text-center">Existencia</th>
+                        <th>Ingreso</th><th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in _lista.Skip((_pagina - 1) * TamanoPagina).Take(TamanoPagina))
+                    {
+                        <tr>
+                            <td>
+                                <img class="pv-miniatura pv-clic" src="@Api.UrlImagen(p.Imagen)" alt="@p.Producto" loading="lazy" @onclick="() => VerImagen(p)" />
+                            </td>
+                            <td>
+                                <div class="fw-semibold">@p.Producto</div>
+                                <div class="small text-secondary text-truncate" style="max-width: 280px" title="@p.Descripcion">@p.Descripcion</div>
+                            </td>
+                            <td>@p.Marca</td>
+                            <td class="text-end text-nowrap">@Fmt.Q(p.PrecioCosto)</td>
+                            <td class="text-end text-nowrap fw-semibold">@Fmt.Q(p.PrecioVenta)</td>
+                            <td class="text-center">
+                                <span class="badge @ClaseExistencia(p.Existencia)">@p.Existencia</span>
+                                @if (p.Reservado > 0)
+                                {
+                                    <div class="small text-secondary" title="Unidades apartadas en cajas POS">@p.Reservado reservado</div>
+                                }
+                            </td>
+                            <td class="text-nowrap small">@Fmt.Fecha(p.FechaIngreso)</td>
+                            <td class="text-end text-nowrap">
+                                <button class="btn btn-sm btn-outline-primary" title="Editar" @onclick="() => Editar(p)"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-danger" title="Eliminar" @onclick="() => Eliminar(p)"><i class="bi bi-trash"></i></button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <Paginacion Total="_lista.Count" @bind-Pagina="_pagina" TamanoPagina="TamanoPagina" />
+    }
+</div>
+
+@* ---------------- Formulario ---------------- *@
+<Modal @bind-Visible="_modal" Titulo="@(_actual.IdProducto == 0 ? "Nuevo producto" : "Editar producto")" Icono="bi-box-seam" Tamano="modal-xl">
+    <ChildContent>
+        <AlertaErrores Error="_error" />
+        <EditForm id="frmProducto" Model="_actual" OnValidSubmit="Guardar">
+            <DataAnnotationsValidator />
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <label class="form-label">Imagen del producto</label>
+                    <div class="pv-imagen-editor">
+                        <img src="@ImagenVistaPrevia" alt="Vista previa" />
+                    </div>
+                    <InputFile class="form-control form-control-sm mt-2" accept=".jpg,.jpeg,.png,.webp" OnChange="SeleccionarImagen" />
+                    <div class="form-text">JPG, PNG o WEBP · máximo 2 MB. Se guarda en el servidor; en la BD solo la ruta.</div>
+                    @if (!string.IsNullOrEmpty(_errorImagen))
+                    {
+                        <div class="text-danger small">@_errorImagen</div>
+                    }
+                    @if (_actual.IdProducto != 0 && !string.IsNullOrEmpty(_actual.Imagen) && _archivo is null)
+                    {
+                        <button type="button" class="btn btn-sm btn-link text-danger px-0" @onclick="QuitarImagen"><i class="bi bi-x-circle me-1"></i>Quitar imagen</button>
+                        <div class="small text-secondary text-break"><i class="bi bi-link-45deg"></i>@_actual.Imagen</div>
+                    }
+                </div>
+                <div class="col-md-8">
+                    <div class="row g-3">
+                        <div class="col-md-7">
+                            <label class="form-label" for="producto">Producto *</label>
+                            <InputText id="producto" class="form-control" @bind-Value="_actual.Producto" maxlength="50" />
+                            <ValidationMessage For="() => _actual.Producto" />
+                        </div>
+                        <div class="col-md-5">
+                            <div class="d-flex justify-content-between align-items-end">
+                                <label class="form-label" for="marca">Marca *</label>
+                                <a class="small mb-2" href="marcas"><i class="bi bi-box-arrow-up-right me-1"></i>Ir a Marcas</a>
+                            </div>
+                            <InputSelect id="marca" class="form-select" @bind-Value="_actual.IdMarca">
+                                <option value="0">-- Seleccione --</option>
+                                @foreach (var m in _marcas)
+                                {
+                                    <option value="@m.Id">@m.Texto</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => _actual.IdMarca" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="descripcion">Descripción *</label>
+                            <InputTextArea id="descripcion" class="form-control" rows="2" @bind-Value="_actual.Descripcion" maxlength="100" />
+                            <ValidationMessage For="() => _actual.Descripcion" />
+                        </div>
+                        <div class="col-sm-4">
+                            <label class="form-label" for="costo">Precio de costo *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Q</span>
+                                <InputNumber id="costo" class="form-control" @bind-Value="_actual.PrecioCosto" step="0.01" />
+                            </div>
+                            <ValidationMessage For="() => _actual.PrecioCosto" />
+                        </div>
+                        <div class="col-sm-4">
+                            <label class="form-label" for="venta">Precio de venta</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Q</span>
+                                <input id="venta" class="form-control fw-semibold" value="@PrecioVentaCalculado.ToString("0.00")" readonly />
+                            </div>
+                            <div class="form-text">Costo + @_porcentaje.ToString("0.##") % (automático)</div>
+                        </div>
+                        <div class="col-sm-4">
+                            <label class="form-label" for="existencia">Existencia</label>
+                            <InputNumber id="existencia" class="form-control" @bind-Value="_actual.Existencia" disabled="@(_actual.IdProducto != 0)" />
+                            <ValidationMessage For="() => _actual.Existencia" />
+                            <div class="form-text">
+                                @(_actual.IdProducto == 0 ? "Existencia inicial." : "Se actualiza con compras (+) y ventas (−).")
+                            </div>
+                        </div>
+                        @if (_actual.FechaIngreso is not null)
+                        {
+                            <div class="col-12 small text-secondary"><i class="bi bi-calendar3 me-1"></i>Fecha de ingreso: @Fmt.FechaHora(_actual.FechaIngreso)</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </EditForm>
+    </ChildContent>
+    <Pie>
+        <button class="btn btn-light" @onclick="() => _modal = false">Cancelar</button>
+        <button type="submit" form="frmProducto" class="btn btn-primary" disabled="@_guardando">
+            @if (_guardando)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+            }
+            <i class="bi bi-check2 me-1"></i>Guardar
+        </button>
+    </Pie>
+</Modal>
+
+@* ---------------- Imagen ampliada ---------------- *@
+<Modal @bind-Visible="_modalImagen" Titulo="@(_imagenAmpliada?.Producto ?? "")" Icono="bi-image" Tamano="">
+    <ChildContent>
+        @if (_imagenAmpliada is not null)
+        {
+            <img class="img-fluid rounded w-100" src="@Api.UrlImagen(_imagenAmpliada.Imagen)" alt="@_imagenAmpliada.Producto" />
+            <p class="mt-3 mb-1">@_imagenAmpliada.Descripcion</p>
+            <div class="d-flex justify-content-between">
+                <span class="text-secondary">@_imagenAmpliada.Marca</span>
+                <strong class="text-primary">@Fmt.Q(_imagenAmpliada.PrecioVenta)</strong>
+            </div>
+        }
+    </ChildContent>
+</Modal>
+
+@code {
+    private const int TamanoPagina = 12;
+    private const long TamanoMaximoImagen = 2 * 1024 * 1024;
+
+    private List<ProductoDto>? _lista;
+    private List<OpcionDto> _marcas = [];
+    private ProductoDto _actual = new();
+    private ProductoDto? _imagenAmpliada;
+    private ApiException? _error;
+    private string _buscar = string.Empty;
+    private int _filtroMarca;
+    private int _pagina = 1;
+    private bool _modal, _modalImagen, _guardando, _vistaTarjetas;
+    private decimal _porcentaje = 25;
+    private int _existenciaMinima = 5;
+
+    // Imagen seleccionada (aún no subida)
+    private byte[]? _archivo;
+    private string? _nombreArchivo, _tipoArchivo, _vistaPreviaLocal, _errorImagen;
+
+    private decimal PrecioVentaCalculado =>
+        Math.Round(_actual.PrecioCosto * (1 + _porcentaje / 100m), 2, MidpointRounding.AwayFromZero);
+
+    private string ImagenVistaPrevia => _vistaPreviaLocal ?? Api.UrlImagen(_actual.Imagen);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _marcas = await Api.GetAsync<List<OpcionDto>>("api/marcas/opciones") ?? [];
+            var config = await Api.GetAsync<ConfiguracionDto>("api/configuracion");
+            if (config is not null) { _porcentaje = config.PorcentajeGanancia; _existenciaMinima = config.ExistenciaMinima; }
+        }
+        catch (ApiException ex) { Notificar.Error(ex.Message); }
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        _pagina = 1;
+        try
+        {
+            var url = $"api/productos?buscar={Uri.EscapeDataString(_buscar)}" + (_filtroMarca > 0 ? $"&idMarca={_filtroMarca}" : "");
+            _lista = await Api.GetAsync<List<ProductoDto>>(url) ?? [];
+        }
+        catch (ApiException ex) { Notificar.Error(ex.Message); _lista = []; }
+    }
+
+    private Task Buscar(string texto)
+    {
+        _buscar = texto;
+        return Cargar();
+    }
+
+    private string ClaseExistencia(int existencia) =>
+        existencia <= 0 ? "text-bg-danger" : existencia <= _existenciaMinima ? "text-bg-warning" : "text-bg-success";
+
+    private void LimpiarArchivo()
+    {
+        _archivo = null; _nombreArchivo = null; _tipoArchivo = null; _vistaPreviaLocal = null; _errorImagen = null;
+    }
+
+    private void Nuevo()
+    {
+        _actual = new ProductoDto();
+        LimpiarArchivo();
+        _error = null;
+        _modal = true;
+    }
+
+    private void Editar(ProductoDto p)
+    {
+        _actual = new ProductoDto
+        {
+            IdProducto = p.IdProducto, Producto = p.Producto, IdMarca = p.IdMarca, Descripcion = p.Descripcion,
+            PrecioCosto = p.PrecioCosto, PrecioVenta = p.PrecioVenta, Existencia = p.Existencia,
+            Imagen = p.Imagen, Marca = p.Marca, FechaIngreso = p.FechaIngreso
+        };
+        LimpiarArchivo();
+        _error = null;
+        _modal = true;
+    }
+
+    private void VerImagen(ProductoDto p)
+    {
+        _imagenAmpliada = p;
+        _modalImagen = true;
+    }
+
+    private async Task SeleccionarImagen(InputFileChangeEventArgs e)
+    {
+        LimpiarArchivo();
+        var archivo = e.File;
+        var extension = Path.GetExtension(archivo.Name).ToLowerInvariant();
+        if (extension is not (".jpg" or ".jpeg" or ".png" or ".webp"))
+        {
+            _errorImagen = "Formato no permitido. Use JPG, PNG o WEBP.";
+            return;
+        }
+        if (archivo.Size > TamanoMaximoImagen)
+        {
+            _errorImagen = "La imagen no puede pesar más de 2 MB.";
+            return;
+        }
+
+        using var memoria = new MemoryStream();
+        await archivo.OpenReadStream(TamanoMaximoImagen).CopyToAsync(memoria);
+        _archivo = memoria.ToArray();
+        _nombreArchivo = archivo.Name;
+        _tipoArchivo = string.IsNullOrEmpty(archivo.ContentType) ? "image/jpeg" : archivo.ContentType;
+        _vistaPreviaLocal = $"data:{_tipoArchivo};base64,{Convert.ToBase64String(_archivo)}";
+    }
+
+    private async Task QuitarImagen()
+    {
+        if (!await Confirmar.PreguntarAsync("Quitar imagen", "¿Desea eliminar la imagen de este producto?", "Sí, quitar")) return;
+        try
+        {
+            await Api.DeleteAsync($"api/productos/{_actual.IdProducto}/imagen");
+            _actual.Imagen = null;
+            Notificar.Exito("Imagen eliminada.");
+            await Cargar();
+        }
+        catch (ApiException ex) { Notificar.Error(ex.Message); }
+    }
+
+    private async Task Guardar()
+    {
+        _guardando = true; _error = null;
+        try
+        {
+            // 1. Guardar los datos (JSON)
+            ProductoDto? guardado = _actual.IdProducto == 0
+                ? await Api.PostAsync<ProductoDto, ProductoDto>("api/productos", _actual)
+                : await Api.PutAsync<ProductoDto, ProductoDto>($"api/productos/{_actual.IdProducto}", _actual);
+
+            // 2. Subir la imagen al servidor (multipart/form-data), si se seleccionó una
+            if (_archivo is not null && guardado is not null)
+            {
+                using var contenido = new MultipartFormDataContent();
+                var bytes = new ByteArrayContent(_archivo);
+                bytes.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(_tipoArchivo ?? "image/jpeg");
+                contenido.Add(bytes, "archivo", _nombreArchivo ?? "imagen.jpg");
+                await Api.PostFormAsync<ImagenProductoDto>($"api/productos/{guardado.IdProducto}/imagen", contenido);
+            }
+
+            Notificar.Exito($"Producto '{_actual.Producto}' guardado. Precio de venta: {Fmt.Q(guardado?.PrecioVenta ?? PrecioVentaCalculado)}");
+            _modal = false;
+            await Cargar();
+        }
+        catch (ApiException ex) { _error = ex; }
+        finally { _guardando = false; }
+    }
+
+    private async Task Eliminar(ProductoDto p)
+    {
+        if (!await Confirmar.PreguntarAsync("Eliminar producto", $"¿Desea eliminar '{p.Producto}'? También se borrará su imagen del servidor.")) return;
+        try
+        {
+            await Api.DeleteAsync($"api/productos/{p.IdProducto}");
+            Notificar.Exito("Producto eliminado.");
+            await Cargar();
+        }
+        catch (ApiException ex) { Notificar.Error(ex.Message); }
+    }
+}
