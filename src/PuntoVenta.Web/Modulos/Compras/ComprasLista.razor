@@ -1,0 +1,141 @@
+@page "/compras"
+@inject ApiService Api
+@inject NotificacionService Notificar
+@inject ConfirmacionService Confirmar
+@inject NavigationManager Nav
+
+<PageTitle>Compras · Punto de Venta</PageTitle>
+
+<EncabezadoPagina Titulo="Compras" Icono="bi-cart-plus" Descripcion="Órdenes de compra a proveedores. Cada compra aumenta la existencia y actualiza precios.">
+    <Acciones>
+        <a class="btn btn-outline-secondary" href="proveedores"><i class="bi bi-truck me-1"></i>Administrar proveedores</a>
+        <a class="btn btn-primary" href="compras/nueva"><i class="bi bi-plus-lg me-1"></i>Nueva compra</a>
+    </Acciones>
+</EncabezadoPagina>
+
+<div class="pv-card">
+    <div class="pv-card-header">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-4"><Buscador Placeholder="No. de orden o proveedor..." AlBuscar="Buscar" /></div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1" for="desde">Desde</label>
+                <input id="desde" type="date" class="form-control" @bind="_desde" @bind:after="Cargar" />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1" for="hasta">Hasta</label>
+                <input id="hasta" type="date" class="form-control" @bind="_hasta" @bind:after="Cargar" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small mb-1" for="prov">Proveedor</label>
+                <select id="prov" class="form-select" @bind="_idProveedor" @bind:after="Cargar">
+                    <option value="0">Todos</option>
+                    @foreach (var p in _proveedores)
+                    {
+                        <option value="@p.Id">@p.Texto</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-1 text-md-end">
+                <button class="btn btn-light w-100" title="Limpiar filtros" @onclick="Limpiar"><i class="bi bi-eraser"></i></button>
+            </div>
+        </div>
+    </div>
+
+    @if (_lista is null)
+    {
+        <Cargando />
+    }
+    else if (_lista.Count == 0)
+    {
+        <EstadoVacio Icono="bi-cart" Texto="No hay compras con esos filtros." />
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr><th>No. orden</th><th>Fecha</th><th>Proveedor</th><th class="text-center">Productos</th><th class="text-center">Unidades</th><th class="text-end">Total</th><th class="text-end">Acciones</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in _lista.Skip((_pagina - 1) * TamanoPagina).Take(TamanoPagina))
+                    {
+                        <tr class="pv-clic" @onclick='() => Nav.NavigateTo($"compras/{c.IdCompra}")'>
+                            <td class="fw-semibold">#@c.NoOrdenCompra</td>
+                            <td class="text-nowrap">@Fmt.Fecha(c.FechaOrden)</td>
+                            <td>@c.Proveedor</td>
+                            <td class="text-center">@c.Productos</td>
+                            <td class="text-center">@c.Unidades</td>
+                            <td class="text-end fw-semibold text-nowrap">@Fmt.Q(c.Total)</td>
+                            <td class="text-end text-nowrap" @onclick:stopPropagation="true">
+                                <a class="btn btn-sm btn-outline-primary" title="Ver / editar" href="compras/@c.IdCompra"><i class="bi bi-pencil"></i></a>
+                                <button class="btn btn-sm btn-outline-danger" title="Eliminar" @onclick="() => Eliminar(c)"><i class="bi bi-trash"></i></button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr class="table-light">
+                        <td colspan="4" class="text-end fw-semibold">Total de compras filtradas</td>
+                        <td class="text-center fw-semibold">@_lista.Sum(c => c.Unidades)</td>
+                        <td class="text-end fw-bold text-nowrap">@Fmt.Q(_lista.Sum(c => c.Total))</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <Paginacion Total="_lista.Count" @bind-Pagina="_pagina" TamanoPagina="TamanoPagina" />
+    }
+</div>
+
+@code {
+    private const int TamanoPagina = 10;
+    private List<CompraDto>? _lista;
+    private List<OpcionDto> _proveedores = [];
+    private string _buscar = string.Empty;
+    private DateOnly? _desde, _hasta;
+    private int _idProveedor;
+    private int _pagina = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _proveedores = await Api.GetAsync<List<OpcionDto>>("api/proveedores/opciones") ?? []; }
+        catch (ApiException ex) { Notificar.Error(ex.Message); }
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        _pagina = 1;
+        var url = $"api/compras?buscar={Uri.EscapeDataString(_buscar)}";
+        if (_desde is not null) url += $"&desde={Fmt.Iso(_desde.Value)}";
+        if (_hasta is not null) url += $"&hasta={Fmt.Iso(_hasta.Value)}";
+        if (_idProveedor > 0) url += $"&idProveedor={_idProveedor}";
+        try { _lista = await Api.GetAsync<List<CompraDto>>(url) ?? []; }
+        catch (ApiException ex) { Notificar.Error(ex.Message); _lista = []; }
+    }
+
+    private Task Buscar(string texto)
+    {
+        _buscar = texto;
+        return Cargar();
+    }
+
+    private Task Limpiar()
+    {
+        _desde = null; _hasta = null; _idProveedor = 0;
+        return Cargar();
+    }
+
+    private async Task Eliminar(CompraDto c)
+    {
+        if (!await Confirmar.PreguntarAsync("Eliminar compra",
+                $"¿Eliminar la orden #{c.NoOrdenCompra}? Se descontarán {c.Unidades} unidades de la existencia.")) return;
+        try
+        {
+            await Api.DeleteAsync($"api/compras/{c.IdCompra}");
+            Notificar.Exito("Compra eliminada y existencias revertidas.");
+            await Cargar();
+        }
+        catch (ApiException ex) { Notificar.Error(ex.Message); }
+    }
+}
