@@ -1,0 +1,49 @@
+@* Factura / ticket de 80 mm. Se ve en pantalla como vista previa y se imprime con Navegador.ImprimirAsync()
+   (en la impresión solo aparece el elemento .pv-imprimible). Lo usan Ventas y el POS. *@
+
+@if (Venta is not null)
+{
+    <div class="pv-ticket @(SoloImpresion ? "pv-solo-impresion" : "") pv-imprimible">
+        <div class="text-center">
+            <div class="pv-ticket-titulo">PUNTO DE VENTA</div>
+            <div>Ciudad de Guatemala</div>
+            <div>Factura serie @Venta.Serie No. @Venta.NoFactura.ToString("000000")</div>
+            <div>@Fmt.Fecha(Venta.FechaFactura) @Venta.FechaIngreso.ToString("HH:mm")</div>
+        </div>
+        <hr />
+        <div><strong>Cliente:</strong> @Venta.Cliente</div>
+        <div><strong>NIT:</strong> @Venta.NitCliente</div>
+        <div><strong>Atendió:</strong> @Venta.Empleado</div>
+        <hr />
+        <table class="w-100">
+            <thead>
+                <tr><th class="text-start">Cant. Producto</th><th class="text-end">Subtotal</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var d in Venta.Detalles)
+                {
+                    <tr>
+                        <td>@d.Cantidad x @d.Producto<br /><small>@Fmt.Q(d.PrecioUnitario) c/u</small></td>
+                        <td class="text-end align-top">@Fmt.Q(d.Subtotal)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <hr />
+        <div class="d-flex justify-content-between pv-ticket-total"><span>TOTAL</span><span>@Fmt.Q(Venta.Total)</span></div>
+        @if (EfectivoRecibido is decimal efectivo && efectivo > 0)
+        {
+            <div class="d-flex justify-content-between"><span>Efectivo</span><span>@Fmt.Q(efectivo)</span></div>
+            <div class="d-flex justify-content-between"><span>Cambio</span><span>@Fmt.Q(Math.Max(0, efectivo - Venta.Total))</span></div>
+        }
+        <hr />
+        <div class="text-center">¡Gracias por su compra!</div>
+    </div>
+}
+
+@code {
+    [Parameter] public VentaDto? Venta { get; set; }
+    [Parameter] public decimal? EfectivoRecibido { get; set; }
+    /// <summary>true: no se muestra en pantalla, solo al imprimir.</summary>
+    [Parameter] public bool SoloImpresion { get; set; }
+}

@@ -1,0 +1,355 @@
+@page "/ventas/nueva"
+@page "/ventas/{Id:int}"
+@inject ApiService Api
+@inject NotificacionService Notificar
+@inject ConfirmacionService Confirmar
+@inject NavigationManager Nav
+@inject Navegador Navegador
+
+<PageTitle>@(EsNueva ? "Nueva venta" : $"Venta {_venta?.Factura}") · Punto de Venta</PageTitle>
+
+<EncabezadoPagina Titulo="@(EsNueva ? "Nueva venta" : $"Factura {_venta?.Factura}")" Icono="bi-receipt"
+                  Descripcion="Maestro (cliente, empleado) y detalle (productos) se registran juntos en una sola operación.">
+    <Acciones>
+        <a class="btn btn-outline-secondary" href="ventas"><i class="bi bi-arrow-left me-1"></i>Volver al listado</a>
+        @if (!EsNueva && _venta is not null)
+        {
+            <button class="btn btn-outline-primary" @onclick="() => Navegador.ImprimirAsync()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+        }
+    </Acciones>
+</EncabezadoPagina>
+
+@if (_cargando)
+{
+    <Cargando />
+}
+else
+{
+    <AlertaErrores Error="_error" />
+
+    <div class="row g-3">
+        <div class="col-xl-8">
+            <EditForm id="frmVenta" Model="_modelo" OnValidSubmit="Guardar">
+                <DataAnnotationsValidator />
+                <div class="pv-card mb-3">
+                    <div class="pv-card-header fw-semibold"><i class="bi bi-file-earmark-text me-2"></i>Datos de la factura</div>
+                    <div class="pv-card-body">
+                        <div class="row g-3">
+                            <div class="col-6 col-md-3">
+                                <label class="form-label">Serie y número</label>
+                                <input class="form-control" readonly value="@(_venta?.Factura ?? $"{_serie}-(automático)")" />
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="form-label" for="fecha">Fecha *</label>
+                                <InputDate id="fecha" class="form-control" @bind-Value="_modelo.FechaFactura" />
+                                <ValidationMessage For="() => _modelo.FechaFactura" />
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex justify-content-between align-items-end">
+                                    <label class="form-label" for="cliente">Cliente *</label>
+                                    <a class="small mb-2" href="clientes"><i class="bi bi-box-arrow-up-right me-1"></i>Ir a Clientes</a>
+                                </div>
+                                <InputSelect id="cliente" class="form-select" @bind-Value="_modelo.IdCliente">
+                                    <option value="0">-- Seleccione un cliente --</option>
+                                    @foreach (var c in _clientes)
+                                    {
+                                        <option value="@c.Id">@c.Texto</option>
+                                    }
+                                </InputSelect>
+                                <ValidationMessage For="() => _modelo.IdCliente" />
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex justify-content-between align-items-end">
+                                    <label class="form-label" for="empleado">Empleado que atiende *</label>
+                                    <a class="small mb-2" href="empleados"><i class="bi bi-box-arrow-up-right me-1"></i>Ir a Empleados</a>
+                                </div>
+                                <InputSelect id="empleado" class="form-select" @bind-Value="_modelo.IdEmpleado">
+                                    <option value="0">-- Seleccione un empleado --</option>
+                                    @foreach (var e in _empleados)
+                                    {
+                                        <option value="@e.Id">@e.Texto</option>
+                                    }
+                                </InputSelect>
+                                <ValidationMessage For="() => _modelo.IdEmpleado" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </EditForm>
+
+            <div class="pv-card">
+                <div class="pv-card-header fw-semibold"><i class="bi bi-list-check me-2"></i>Detalle de productos</div>
+                <div class="pv-card-body border-bottom">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-6">
+                            <label class="form-label small mb-1" for="producto">Producto</label>
+                            <select id="producto" class="form-select" @bind="_idProductoNuevo" @bind:after="() => _alerta = null">
+                                <option value="0">-- Seleccione un producto --</option>
+                                @foreach (var p in _productos)
+                                {
+                                    <option value="@p.IdProducto">@p.Texto · @Fmt.Q(p.PrecioVenta) · disp. @p.Disponible</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-4 col-md-2">
+                            <label class="form-label small mb-1" for="cantidad">Cantidad</label>
+                            <input id="cantidad" type="number" min="1" class="form-control" @bind="_cantidadNueva" />
+                        </div>
+                        <div class="col-8 col-md-4">
+                            <button class="btn btn-outline-primary w-100" @onclick="VerificarYAgregar" disabled="@_verificando">
+                                @if (_verificando)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                }
+                                <i class="bi bi-search me-1"></i>Verificar existencia y agregar
+                            </button>
+                        </div>
+                    </div>
+                    @if (_alerta is not null)
+                    {
+                        <div class="alert alert-warning py-2 mt-3 mb-0 d-flex gap-2">
+                            <i class="bi bi-exclamation-triangle mt-1"></i><div>@((MarkupString)_alerta)</div>
+                        </div>
+                    }
+                </div>
+
+                @if (_modelo.Detalles.Count == 0)
+                {
+                    <EstadoVacio Icono="bi-basket" Texto="Agregue los productos de la venta." />
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead>
+                                <tr><th>Producto</th><th class="text-end">Precio</th><th style="width:120px">Cantidad</th><th class="text-end">Subtotal</th><th></th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var d in _modelo.Detalles)
+                                {
+                                    var p = Producto(d.IdProducto);
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <img class="pv-miniatura" src="@Api.UrlImagen(p?.Imagen)" alt="" />
+                                                <div>
+                                                    <div class="fw-semibold">@p?.Producto</div>
+                                                    <div class="small text-secondary">@p?.Marca · máx. @MaximoPermitido(d.IdProducto)</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="text-end text-nowrap">@Fmt.Q(Precio(d.IdProducto))</td>
+                                        <td>
+                                            <input type="number" min="1" max="@MaximoPermitido(d.IdProducto)" class="form-control form-control-sm"
+                                                   value="@d.Cantidad" @onchange="e => CambiarCantidad(d, e.Value)" />
+                                        </td>
+                                        <td class="text-end fw-semibold text-nowrap">@Fmt.Q(Subtotal(d))</td>
+                                        <td class="text-end">
+                                            <button class="btn btn-sm btn-outline-danger" title="Quitar" @onclick="() => _modelo.Detalles.Remove(d)"><i class="bi bi-x-lg"></i></button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="col-xl-4">
+            <div class="pv-card pv-sticky">
+                <div class="pv-card-header fw-semibold"><i class="bi bi-calculator me-2"></i>Resumen</div>
+                <div class="pv-card-body">
+                    <div class="pv-calculo">
+                        <div><span>Productos</span><strong>@_modelo.Detalles.Count</strong></div>
+                        <div><span>Unidades</span><strong>@_modelo.Detalles.Sum(d => d.Cantidad)</strong></div>
+                        <div class="total"><span>Total de la venta</span><strong>@Fmt.Q(Total)</strong></div>
+                    </div>
+                    <button type="submit" form="frmVenta" class="btn btn-primary btn-lg w-100 mt-3" disabled="@(_guardando || _modelo.Detalles.Count == 0)">
+                        @if (_guardando)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        <i class="bi bi-check2-circle me-1"></i>@(EsNueva ? "Confirmar venta" : "Guardar cambios")
+                    </button>
+                    @if (!EsNueva)
+                    {
+                        <button class="btn btn-outline-danger w-100 mt-2" @onclick="Anular" disabled="@_guardando"><i class="bi bi-x-octagon me-1"></i>Anular venta</button>
+                    }
+                    <p class="small text-secondary mt-3 mb-0">
+                        El precio corresponde al precio de venta registrado en Productos. Al confirmar, la existencia
+                        disminuye automáticamente.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <FacturaImpresion Venta="_venta" SoloImpresion="true" />
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private bool EsNueva => Id is null;
+
+    private VentaGuardarDto _modelo = new();
+    private VentaDto? _venta;
+    private List<OpcionDto> _clientes = [], _empleados = [];
+    private List<ProductoOpcionDto> _productos = [];
+    private Dictionary<int, decimal> _preciosOriginales = [];  // al editar: precio con que se vendió
+    private Dictionary<int, int> _cantidadOriginal = [];       // al editar: unidades que ya descontó esta venta
+    private string _serie = "A";
+    private int _idProductoNuevo, _cantidadNueva = 1;
+    private string? _alerta;
+    private ApiException? _error;
+    private bool _cargando = true, _guardando, _verificando;
+
+    private ProductoOpcionDto? Producto(int id) => _productos.FirstOrDefault(p => p.IdProducto == id);
+    private decimal Precio(int id) => _preciosOriginales.TryGetValue(id, out var p) ? p : Producto(id)?.PrecioVenta ?? 0;
+    private decimal Subtotal(VentaDetalleGuardarDto d) => Math.Round(d.Cantidad * Precio(d.IdProducto), 2);
+    private decimal Total => _modelo.Detalles.Sum(Subtotal);
+    private int MaximoPermitido(int id) => (Producto(id)?.Disponible ?? 0) + _cantidadOriginal.GetValueOrDefault(id);
+
+    [CascadingParameter] private Task<AuthenticationState>? EstadoAuth { get; set; }
+
+    private int? _idCargado = -1;
+
+    // Se usa OnParametersSet (no OnInitialized) porque al guardar una venta nueva se navega a
+    // /ventas/{id} y Blazor reutiliza esta misma página: hay que recargar con el nuevo Id.
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_idCargado == Id) return;
+        _idCargado = Id;
+        _cargando = true;
+        _error = null; _alerta = null; _venta = null;
+        _modelo = new VentaGuardarDto();
+        _preciosOriginales = []; _cantidadOriginal = [];
+        try
+        {
+            if (_clientes.Count == 0)
+            {
+                _clientes = await Api.GetAsync<List<OpcionDto>>("api/clientes/opciones") ?? [];
+                _empleados = await Api.GetAsync<List<OpcionDto>>("api/empleados/opciones") ?? [];
+                _serie = (await Api.GetAsync<PuntoVenta.Shared.Configuracion.ConfiguracionDto>("api/configuracion"))?.SerieFactura ?? "A";
+            }
+            // Siempre recargar productos: la existencia cambia con cada venta
+            _productos = await Api.GetAsync<List<ProductoOpcionDto>>("api/productos/opciones") ?? [];
+
+            if (EsNueva)
+            {
+                _modelo.FechaFactura = DateOnly.FromDateTime(DateTime.Today);
+                _modelo.IdCliente = _clientes.FirstOrDefault()?.Id ?? 0;   // "CF" aparece primero
+                // Empleado del usuario que inició sesión (claim id_empleado del JWT)
+                if (EstadoAuth is not null && int.TryParse((await EstadoAuth).User.FindFirst("id_empleado")?.Value, out var idEmp))
+                    _modelo.IdEmpleado = idEmp;
+            }
+            else
+            {
+                _venta = await Api.GetAsync<VentaDto>($"api/ventas/{Id}");
+                if (_venta is not null)
+                {
+                    _modelo = new VentaGuardarDto
+                    {
+                        IdCliente = _venta.IdCliente,
+                        IdEmpleado = _venta.IdEmpleado,
+                        FechaFactura = _venta.FechaFactura,
+                        Detalles = _venta.Detalles.Select(d => new VentaDetalleGuardarDto { IdProducto = d.IdProducto, Cantidad = d.Cantidad }).ToList()
+                    };
+                    _preciosOriginales = _venta.Detalles.ToDictionary(d => d.IdProducto, d => d.PrecioUnitario);
+                    _cantidadOriginal = _venta.Detalles.ToDictionary(d => d.IdProducto, d => d.Cantidad);
+                }
+            }
+        }
+        catch (ApiException ex) { _error = ex; }
+        finally { _cargando = false; }
+    }
+
+    /// <summary>Regla: antes de agregar un producto se verifica su existencia en la API.</summary>
+    private async Task VerificarYAgregar()
+    {
+        _alerta = null;
+        if (_idProductoNuevo <= 0) { _alerta = "Seleccione un producto."; return; }
+        if (_cantidadNueva <= 0) { _alerta = "La cantidad debe ser mayor a cero."; return; }
+
+        _verificando = true;
+        try
+        {
+            var disp = await Api.GetAsync<DisponibilidadDto>($"api/ventas/disponibilidad/{_idProductoNuevo}");
+            if (disp is null) return;
+
+            var enDetalle = _modelo.Detalles.FirstOrDefault(d => d.IdProducto == _idProductoNuevo);
+            var solicitado = _cantidadNueva + (enDetalle?.Cantidad ?? 0);
+            var disponible = disp.Disponible + _cantidadOriginal.GetValueOrDefault(_idProductoNuevo);
+
+            // Actualizar el combo con la existencia más reciente
+            if (Producto(_idProductoNuevo) is { } p) { p.Existencia = disp.Existencia; p.Reservado = disp.Reservado; p.PrecioVenta = disp.PrecioVenta; }
+
+            if (solicitado > disponible)
+            {
+                _alerta = $"<strong>No se puede realizar la venta. Existencia insuficiente.</strong><br/>" +
+                          $"{disp.Producto}: disponible <strong>{disponible}</strong>, solicitado <strong>{solicitado}</strong>" +
+                          (disp.Reservado > 0 ? $" ({disp.Reservado} reservadas en una caja POS)." : ".");
+                return;
+            }
+
+            if (enDetalle is not null) enDetalle.Cantidad = solicitado;
+            else _modelo.Detalles.Add(new VentaDetalleGuardarDto { IdProducto = _idProductoNuevo, Cantidad = _cantidadNueva });
+
+            _idProductoNuevo = 0;
+            _cantidadNueva = 1;
+        }
+        catch (ApiException ex) { _alerta = ex.Message; }
+        finally { _verificando = false; }
+    }
+
+    private void CambiarCantidad(VentaDetalleGuardarDto d, object? valor)
+    {
+        if (!int.TryParse(valor?.ToString(), out var cantidad) || cantidad < 1) cantidad = 1;
+        var maximo = MaximoPermitido(d.IdProducto);
+        if (cantidad > maximo)
+        {
+            Notificar.Advertencia($"Existencia insuficiente: máximo {maximo} unidades de '{Producto(d.IdProducto)?.Producto}'.");
+            cantidad = maximo;
+        }
+        d.Cantidad = cantidad;
+    }
+
+    private async Task Guardar()
+    {
+        _guardando = true; _error = null;
+        try
+        {
+            VentaDto? resultado = EsNueva
+                ? await Api.PostAsync<VentaGuardarDto, VentaDto>("api/ventas", _modelo)
+                : await Api.PutAsync<VentaGuardarDto, VentaDto>($"api/ventas/{Id}", _modelo);
+
+            Notificar.Exito($"Factura {resultado?.Factura} guardada por {Fmt.Q(resultado?.Total ?? Total)}. Existencias actualizadas.");
+            if (resultado is null)
+                Nav.NavigateTo("ventas");
+            else if (EsNueva)
+                Nav.NavigateTo($"ventas/{resultado.IdVenta}");   // muestra la factura con opción de imprimir
+            else
+            {
+                _idCargado = -1;                                 // recargar datos actualizados
+                await OnParametersSetAsync();
+            }
+        }
+        catch (ApiException ex) { _error = ex; }
+        finally { _guardando = false; }
+    }
+
+    private async Task Anular()
+    {
+        if (!await Confirmar.PreguntarAsync("Anular venta", $"¿Anular la factura {_venta?.Factura}? Las unidades regresarán a la existencia.", "Sí, anular")) return;
+        _guardando = true;
+        try
+        {
+            await Api.DeleteAsync($"api/ventas/{Id}");
+            Notificar.Exito("Venta anulada. Existencias restauradas.");
+            Nav.NavigateTo("ventas");
+        }
+        catch (ApiException ex) { Notificar.Error(ex.Message); }
+        finally { _guardando = false; }
+    }
+}

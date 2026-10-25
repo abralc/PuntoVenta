@@ -1,0 +1,145 @@
+@page "/ventas"
+@inject ApiService Api
+@inject NotificacionService Notificar
+@inject ConfirmacionService Confirmar
+@inject NavigationManager Nav
+
+<PageTitle>Ventas · Punto de Venta</PageTitle>
+
+<EncabezadoPagina Titulo="Ventas" Icono="bi-receipt" Descripcion="Facturas de venta. Cada venta disminuye la existencia de los productos.">
+    <Acciones>
+        <a class="btn btn-outline-secondary" href="clientes"><i class="bi bi-people me-1"></i>Clientes</a>
+        <a class="btn btn-outline-primary" href="pos"><i class="bi bi-shop me-1"></i>Punto de venta</a>
+        <a class="btn btn-primary" href="ventas/nueva"><i class="bi bi-plus-lg me-1"></i>Nueva venta</a>
+    </Acciones>
+</EncabezadoPagina>
+
+<div class="pv-card">
+    <div class="pv-card-header">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3"><Buscador Placeholder="No. factura, cliente o NIT..." AlBuscar="Buscar" /></div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1" for="desde">Desde</label>
+                <input id="desde" type="date" class="form-control" @bind="_desde" @bind:after="Cargar" />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1" for="hasta">Hasta</label>
+                <input id="hasta" type="date" class="form-control" @bind="_hasta" @bind:after="Cargar" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small mb-1" for="emp">Empleado</label>
+                <select id="emp" class="form-select" @bind="_idEmpleado" @bind:after="Cargar">
+                    <option value="0">Todos</option>
+                    @foreach (var e in _empleados)
+                    {
+                        <option value="@e.Id">@e.Texto</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-1">
+                <button class="btn btn-light w-100" title="Limpiar filtros" @onclick="Limpiar"><i class="bi bi-eraser"></i></button>
+            </div>
+        </div>
+    </div>
+
+    @if (_lista is null)
+    {
+        <Cargando />
+    }
+    else if (_lista.Count == 0)
+    {
+        <EstadoVacio Icono="bi-receipt" Texto="No hay ventas con esos filtros." />
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr><th>Factura</th><th>Fecha</th><th>Cliente</th><th>Empleado</th><th class="text-center">Unidades</th><th class="text-end">Total</th><th class="text-end">Acciones</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var v in _lista.Skip((_pagina - 1) * TamanoPagina).Take(TamanoPagina))
+                    {
+                        <tr class="pv-clic" @onclick='() => Nav.NavigateTo($"ventas/{v.IdVenta}")'>
+                            <td class="fw-semibold text-nowrap">@v.Factura</td>
+                            <td class="text-nowrap">@Fmt.Fecha(v.FechaFactura)</td>
+                            <td>
+                                <div>@v.Cliente</div>
+                                <div class="small text-secondary">NIT @v.NitCliente</div>
+                            </td>
+                            <td>@v.Empleado</td>
+                            <td class="text-center">@v.Unidades</td>
+                            <td class="text-end fw-semibold text-nowrap">@Fmt.Q(v.Total)</td>
+                            <td class="text-end text-nowrap" @onclick:stopPropagation="true">
+                                <a class="btn btn-sm btn-outline-primary" title="Ver / editar" href="ventas/@v.IdVenta"><i class="bi bi-pencil"></i></a>
+                                <button class="btn btn-sm btn-outline-danger" title="Anular" @onclick="() => Anular(v)"><i class="bi bi-x-octagon"></i></button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr class="table-light">
+                        <td colspan="4" class="text-end fw-semibold">Total vendido (@_lista.Count facturas)</td>
+                        <td class="text-center fw-semibold">@_lista.Sum(v => v.Unidades)</td>
+                        <td class="text-end fw-bold text-nowrap">@Fmt.Q(_lista.Sum(v => v.Total))</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <Paginacion Total="_lista.Count" @bind-Pagina="_pagina" TamanoPagina="TamanoPagina" />
+    }
+</div>
+
+@code {
+    private const int TamanoPagina = 10;
+    private List<VentaDto>? _lista;
+    private List<OpcionDto> _empleados = [];
+    private string _buscar = string.Empty;
+    private DateOnly? _desde, _hasta;
+    private int _idEmpleado;
+    private int _pagina = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _empleados = await Api.GetAsync<List<OpcionDto>>("api/empleados/opciones") ?? []; }
+        catch (ApiException ex) { Notificar.Error(ex.Message); }
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        _pagina = 1;
+        var url = $"api/ventas?buscar={Uri.EscapeDataString(_buscar)}";
+        if (_desde is not null) url += $"&desde={Fmt.Iso(_desde.Value)}";
+        if (_hasta is not null) url += $"&hasta={Fmt.Iso(_hasta.Value)}";
+        if (_idEmpleado > 0) url += $"&idEmpleado={_idEmpleado}";
+        try { _lista = await Api.GetAsync<List<VentaDto>>(url) ?? []; }
+        catch (ApiException ex) { Notificar.Error(ex.Message); _lista = []; }
+    }
+
+    private Task Buscar(string texto)
+    {
+        _buscar = texto;
+        return Cargar();
+    }
+
+    private Task Limpiar()
+    {
+        _desde = null; _hasta = null; _idEmpleado = 0;
+        return Cargar();
+    }
+
+    private async Task Anular(VentaDto v)
+    {
+        if (!await Confirmar.PreguntarAsync("Anular venta",
+                $"¿Anular la factura {v.Factura}? Las {v.Unidades} unidades regresarán a la existencia.", "Sí, anular")) return;
+        try
+        {
+            await Api.DeleteAsync($"api/ventas/{v.IdVenta}");
+            Notificar.Exito($"Factura {v.Factura} anulada. Existencias restauradas.");
+            await Cargar();
+        }
+        catch (ApiException ex) { Notificar.Error(ex.Message); }
+    }
+}
