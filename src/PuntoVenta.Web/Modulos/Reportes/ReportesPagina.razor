@@ -1,0 +1,308 @@
+@page "/reportes"
+@page "/reportes/{Tipo}"
+@inject ApiService Api
+@inject NotificacionService Notificar
+@inject Navegador Navegador
+
+<PageTitle>Reportes · Punto de Venta</PageTitle>
+
+@if (string.IsNullOrEmpty(Tipo))
+{
+    <EncabezadoPagina Titulo="Reportes" Icono="bi-bar-chart-line" Descripcion="Reportes que combinan información de varias tablas. Se pueden imprimir o exportar a Excel (CSV)." />
+    <div class="row g-3">
+        @foreach (var r in Catalogo)
+        {
+            <div class="col-sm-6 col-xl-3">
+                <a class="pv-acceso pv-reporte-tarjeta" href="reportes/@r.Clave">
+                    <i class="bi @r.Icono"></i>
+                    <span>@r.Titulo</span>
+                    <small class="text-secondary fw-normal">@r.Descripcion</small>
+                </a>
+            </div>
+        }
+    </div>
+}
+else if (Actual is null)
+{
+    <EstadoVacio Icono="bi-question-circle" Texto="El reporte solicitado no existe."><a href="reportes" class="btn btn-primary mt-2">Ver reportes</a></EstadoVacio>
+}
+else
+{
+    <EncabezadoPagina Titulo="@Actual.Titulo" Icono="@Actual.Icono" Descripcion="@Actual.Descripcion">
+        <Acciones>
+            <a class="btn btn-outline-secondary pv-no-imprimir" href="reportes"><i class="bi bi-arrow-left me-1"></i>Reportes</a>
+            <button class="btn btn-outline-success pv-no-imprimir" @onclick="Exportar" disabled="@(_filas == 0)"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel (CSV)</button>
+            <button class="btn btn-outline-primary pv-no-imprimir" @onclick="() => Navegador.ImprimirAsync()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+        </Acciones>
+    </EncabezadoPagina>
+
+    @* ---------------- Filtros ---------------- *@
+    <div class="pv-card mb-3 pv-no-imprimir">
+        <div class="pv-card-body">
+            <div class="row g-2 align-items-end">
+                @if (Tipo is "compras" or "ventas")
+                {
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small mb-1" for="desde">Desde</label>
+                        <input id="desde" type="date" class="form-control" @bind="_desde" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small mb-1" for="hasta">Hasta</label>
+                        <input id="hasta" type="date" class="form-control" @bind="_hasta" />
+                    </div>
+                }
+                @if (Tipo == "productos")
+                {
+                    <div class="col-md-4">
+                        <label class="form-label small mb-1" for="marca">Marca</label>
+                        <select id="marca" class="form-select" @bind="_idFiltro">
+                            <option value="0">Todas</option>
+                            @foreach (var o in _opciones) { <option value="@o.Id">@o.Texto</option> }
+                        </select>
+                    </div>
+                }
+                @if (Tipo == "compras")
+                {
+                    <div class="col-md-4">
+                        <label class="form-label small mb-1" for="prov">Proveedor</label>
+                        <select id="prov" class="form-select" @bind="_idFiltro">
+                            <option value="0">Todos</option>
+                            @foreach (var o in _opciones) { <option value="@o.Id">@o.Texto</option> }
+                        </select>
+                    </div>
+                }
+                @if (Tipo == "ventas")
+                {
+                    <div class="col-md-4">
+                        <label class="form-label small mb-1" for="emp">Empleado</label>
+                        <select id="emp" class="form-select" @bind="_idFiltro">
+                            <option value="0">Todos</option>
+                            @foreach (var o in _opciones) { <option value="@o.Id">@o.Texto</option> }
+                        </select>
+                    </div>
+                }
+                @if (Tipo == "existencias")
+                {
+                    <div class="col-md-6">
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" id="bajas" @bind="_soloBajas" />
+                            <label class="form-check-label" for="bajas">Solo agotados y por agotarse</label>
+                        </div>
+                    </div>
+                }
+                <div class="col-md-2 ms-auto">
+                    <button class="btn btn-primary w-100" @onclick="Cargar"><i class="bi bi-funnel me-1"></i>Generar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="pv-card">
+        <div class="pv-card-header d-flex flex-wrap gap-3 align-items-center">
+            <span class="fw-semibold">@Actual.Titulo</span>
+            <span class="small text-secondary">@Subtitulo</span>
+            <span class="ms-auto small text-secondary">Generado: @DateTime.Now.ToString("dd/MM/yyyy HH:mm")</span>
+        </div>
+
+        @if (_cargando)
+        {
+            <Cargando />
+        }
+        else if (_filas == 0)
+        {
+            <EstadoVacio Icono="bi-clipboard-x" Texto="No hay datos para los filtros seleccionados." />
+        }
+        else
+        {
+            <div class="table-responsive">
+                @switch (Tipo)
+                {
+                    case "productos":
+                        <table class="table table-sm table-striped align-middle mb-0">
+                            <thead><tr><th>Producto</th><th>Marca</th><th class="text-center">Existencia</th><th class="text-end">Precio costo</th><th class="text-end">Precio venta</th><th class="text-end">Valor (costo)</th><th class="text-end">Valor (venta)</th></tr></thead>
+                            <tbody>
+                                @foreach (var r in _productos)
+                                {
+                                    <tr>
+                                        <td>@r.Producto</td><td>@r.Marca</td><td class="text-center">@r.Existencia</td>
+                                        <td class="text-end">@Fmt.Q(r.PrecioCosto)</td><td class="text-end">@Fmt.Q(r.PrecioVenta)</td>
+                                        <td class="text-end">@Fmt.Q(r.ValorCosto)</td><td class="text-end">@Fmt.Q(r.ValorVenta)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot class="table-light fw-semibold">
+                                <tr><td colspan="2">Totales (@_productos.Count productos)</td><td class="text-center">@_productos.Sum(r => r.Existencia)</td><td></td><td></td>
+                                    <td class="text-end">@Fmt.Q(_productos.Sum(r => r.ValorCosto))</td><td class="text-end">@Fmt.Q(_productos.Sum(r => r.ValorVenta))</td></tr>
+                            </tfoot>
+                        </table>
+                        break;
+
+                    case "existencias":
+                        <table class="table table-sm table-striped align-middle mb-0">
+                            <thead><tr><th>Producto</th><th>Marca</th><th class="text-center">Comprado</th><th class="text-center">Vendido</th><th class="text-center">Existencia</th><th class="text-center">Reservado POS</th><th class="text-center">Disponible</th><th>Estado</th></tr></thead>
+                            <tbody>
+                                @foreach (var r in _existencias)
+                                {
+                                    <tr>
+                                        <td>@r.Producto</td><td>@r.Marca</td>
+                                        <td class="text-center">@r.UnidadesCompradas</td><td class="text-center">@r.UnidadesVendidas</td>
+                                        <td class="text-center fw-semibold">@r.Existencia</td><td class="text-center">@r.Reservado</td><td class="text-center">@r.Disponible</td>
+                                        <td><span class="badge @(r.Estado == "Agotado" ? "text-bg-danger" : r.Estado == "Por agotarse" ? "text-bg-warning" : "text-bg-success")">@r.Estado</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot class="table-light fw-semibold">
+                                <tr><td colspan="2">Totales</td><td class="text-center">@_existencias.Sum(r => r.UnidadesCompradas)</td><td class="text-center">@_existencias.Sum(r => r.UnidadesVendidas)</td>
+                                    <td class="text-center">@_existencias.Sum(r => r.Existencia)</td><td class="text-center">@_existencias.Sum(r => r.Reservado)</td><td class="text-center">@_existencias.Sum(r => r.Disponible)</td><td></td></tr>
+                            </tfoot>
+                        </table>
+                        break;
+
+                    case "compras":
+                        <table class="table table-sm table-striped align-middle mb-0">
+                            <thead><tr><th>Fecha</th><th>No. orden</th><th>Proveedor</th><th class="text-center">Productos</th><th class="text-center">Unidades</th><th class="text-end">Total compra</th></tr></thead>
+                            <tbody>
+                                @foreach (var r in _compras)
+                                {
+                                    <tr>
+                                        <td>@Fmt.Fecha(r.FechaOrden)</td><td><a href="compras/@r.IdCompra">#@r.NoOrdenCompra</a></td><td>@r.Proveedor</td>
+                                        <td class="text-center">@r.Productos</td><td class="text-center">@r.Unidades</td><td class="text-end">@Fmt.Q(r.Total)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot class="table-light fw-semibold">
+                                <tr><td colspan="3">Totales (@_compras.Count compras)</td><td class="text-center">@_compras.Sum(r => r.Productos)</td><td class="text-center">@_compras.Sum(r => r.Unidades)</td><td class="text-end">@Fmt.Q(_compras.Sum(r => r.Total))</td></tr>
+                            </tfoot>
+                        </table>
+                        break;
+
+                    case "ventas":
+                        <table class="table table-sm table-striped align-middle mb-0">
+                            <thead><tr><th>Fecha</th><th>Factura</th><th>Cliente</th><th>NIT</th><th>Empleado</th><th class="text-center">Unidades</th><th class="text-end">Total venta</th></tr></thead>
+                            <tbody>
+                                @foreach (var r in _ventas)
+                                {
+                                    <tr>
+                                        <td>@Fmt.Fecha(r.FechaFactura)</td><td><a href="ventas/@r.IdVenta">@r.Factura</a></td><td>@r.Cliente</td><td>@r.Nit</td>
+                                        <td>@r.Empleado</td><td class="text-center">@r.Unidades</td><td class="text-end">@Fmt.Q(r.Total)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot class="table-light fw-semibold">
+                                <tr><td colspan="5">Totales (@_ventas.Count facturas)</td><td class="text-center">@_ventas.Sum(r => r.Unidades)</td><td class="text-end">@Fmt.Q(_ventas.Sum(r => r.Total))</td></tr>
+                            </tfoot>
+                        </table>
+                        break;
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string? Tipo { get; set; }
+
+    private record InfoReporte(string Clave, string Titulo, string Icono, string Descripcion);
+
+    private static readonly InfoReporte[] Catalogo =
+    [
+        new("productos", "Reporte de productos", "bi-file-earmark-text", "Producto, marca, existencia y precios"),
+        new("existencias", "Reporte de existencias", "bi-boxes", "Stock, reservas del POS y productos por agotarse"),
+        new("compras", "Reporte de compras", "bi-file-earmark-arrow-down", "Compras por fecha y proveedor"),
+        new("ventas", "Reporte de ventas", "bi-file-earmark-arrow-up", "Ventas por fecha, cliente y empleado")
+    ];
+
+    private InfoReporte? Actual => Catalogo.FirstOrDefault(r => r.Clave == Tipo);
+
+    private List<ReporteProductoDto> _productos = [];
+    private List<ReporteExistenciaDto> _existencias = [];
+    private List<ReporteCompraDto> _compras = [];
+    private List<ReporteVentaDto> _ventas = [];
+    private List<OpcionDto> _opciones = [];
+    private DateOnly? _desde, _hasta;
+    private int _idFiltro;
+    private bool _soloBajas, _cargando;
+    private string? _tipoCargado;
+
+    private int _filas => Tipo switch
+    {
+        "productos" => _productos.Count,
+        "existencias" => _existencias.Count,
+        "compras" => _compras.Count,
+        "ventas" => _ventas.Count,
+        _ => 0
+    };
+
+    private string Subtitulo =>
+        (_desde, _hasta) switch
+        {
+            (null, null) => "Todas las fechas",
+            _ => $"Del {Fmt.Fecha(_desde)} al {Fmt.Fecha(_hasta)}"
+        };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Tipo == _tipoCargado || Actual is null) return;
+        _tipoCargado = Tipo;
+        _idFiltro = 0;
+        _soloBajas = false;
+        var hoy = DateOnly.FromDateTime(DateTime.Today);
+        _desde = Tipo is "compras" or "ventas" ? new DateOnly(hoy.Year, hoy.Month, 1).AddMonths(-2) : null;
+        _hasta = Tipo is "compras" or "ventas" ? hoy : null;
+
+        var urlOpciones = Tipo switch
+        {
+            "productos" => "api/marcas/opciones",
+            "compras" => "api/proveedores/opciones",
+            "ventas" => "api/empleados/opciones",
+            _ => null
+        };
+        try { _opciones = urlOpciones is null ? [] : await Api.GetAsync<List<OpcionDto>>(urlOpciones) ?? []; }
+        catch (ApiException ex) { Notificar.Error(ex.Message); }
+
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        _cargando = true;
+        try
+        {
+            var fechas = (_desde is null ? "" : $"&desde={Fmt.Iso(_desde.Value)}") + (_hasta is null ? "" : $"&hasta={Fmt.Iso(_hasta.Value)}");
+            switch (Tipo)
+            {
+                case "productos":
+                    _productos = await Api.GetAsync<List<ReporteProductoDto>>($"api/reportes/productos?idMarca={_idFiltro}") ?? [];
+                    break;
+                case "existencias":
+                    _existencias = await Api.GetAsync<List<ReporteExistenciaDto>>($"api/reportes/existencias?soloBajas={_soloBajas.ToString().ToLowerInvariant()}") ?? [];
+                    break;
+                case "compras":
+                    _compras = await Api.GetAsync<List<ReporteCompraDto>>($"api/reportes/compras?idProveedor={_idFiltro}{fechas}") ?? [];
+                    break;
+                case "ventas":
+                    _ventas = await Api.GetAsync<List<ReporteVentaDto>>($"api/reportes/ventas?idEmpleado={_idFiltro}{fechas}") ?? [];
+                    break;
+            }
+        }
+        catch (ApiException ex) { Notificar.Error(ex.Message); }
+        finally { _cargando = false; }
+    }
+
+    private async Task Exportar()
+    {
+        IEnumerable<IEnumerable<object?>> filas = Tipo switch
+        {
+            "productos" => new[] { new object?[] { "Producto", "Marca", "Existencia", "Precio costo", "Precio venta", "Valor costo", "Valor venta" } }
+                .Concat(_productos.Select(r => new object?[] { r.Producto, r.Marca, r.Existencia, r.PrecioCosto, r.PrecioVenta, r.ValorCosto, r.ValorVenta })),
+            "existencias" => new[] { new object?[] { "Producto", "Marca", "Comprado", "Vendido", "Existencia", "Reservado POS", "Disponible", "Estado" } }
+                .Concat(_existencias.Select(r => new object?[] { r.Producto, r.Marca, r.UnidadesCompradas, r.UnidadesVendidas, r.Existencia, r.Reservado, r.Disponible, r.Estado })),
+            "compras" => new[] { new object?[] { "Fecha", "No. orden", "Proveedor", "Productos", "Unidades", "Total" } }
+                .Concat(_compras.Select(r => new object?[] { r.FechaOrden, r.NoOrdenCompra, r.Proveedor, r.Productos, r.Unidades, r.Total })),
+            "ventas" => new[] { new object?[] { "Fecha", "Factura", "Cliente", "NIT", "Empleado", "Unidades", "Total venta" } }
+                .Concat(_ventas.Select(r => new object?[] { r.FechaFactura, r.Factura, r.Cliente, r.Nit, r.Empleado, r.Unidades, r.Total })),
+            _ => []
+        };
+        await Navegador.DescargarCsvAsync($"reporte-{Tipo}-{DateTime.Now:yyyyMMdd-HHmm}.csv", filas);
+    }
+}

@@ -1,0 +1,89 @@
+@* Indicadores de la pantalla de inicio (GET /api/reportes/resumen).
+   Inicio.razor (base) lo muestra si este componente existe, sin depender de él al compilar. *@
+@inject ApiService Api
+
+@if (_resumen is null)
+{
+    @if (_error is null)
+    {
+        <Cargando Texto="Cargando indicadores..." />
+    }
+}
+else
+{
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="pv-kpi"><span class="pv-kpi-icono bg-primary-subtle text-primary"><i class="bi bi-receipt"></i></span>
+                <div><small>Ventas de hoy</small><strong>@Fmt.Q(_resumen.TotalHoy)</strong><small>@_resumen.VentasHoy facturas</small></div></div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="pv-kpi"><span class="pv-kpi-icono bg-success-subtle text-success"><i class="bi bi-graph-up-arrow"></i></span>
+                <div><small>Ventas del mes</small><strong>@Fmt.Q(_resumen.TotalMes)</strong><small>@_resumen.VentasMes facturas</small></div></div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="pv-kpi"><span class="pv-kpi-icono bg-info-subtle text-info-emphasis"><i class="bi bi-cart-plus"></i></span>
+                <div><small>Compras del mes</small><strong>@Fmt.Q(_resumen.TotalComprasMes)</strong><small>@_resumen.ComprasMes órdenes</small></div></div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <a class="pv-kpi text-decoration-none" href="reportes/existencias"><span class="pv-kpi-icono bg-warning-subtle text-warning-emphasis"><i class="bi bi-exclamation-triangle"></i></span>
+                <div><small>Inventario</small><strong>@(_resumen.ProductosPorAgotarse + _resumen.ProductosAgotados) en alerta</strong><small>@_resumen.ProductosAgotados agotados · @_resumen.ProductosPorAgotarse por agotarse</small></div></a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-7">
+            <div class="pv-card h-100">
+                <div class="pv-card-header fw-semibold"><i class="bi bi-bar-chart me-2"></i>Ventas de los últimos 7 días</div>
+                <div class="pv-card-body">
+                    <div class="pv-barras">
+                        @foreach (var d in _resumen.UltimosDias)
+                        {
+                            <div class="pv-barra" title="@Fmt.Fecha(d.Fecha): @Fmt.Q(d.Total) (@d.Ventas ventas)">
+                                <span class="pv-barra-valor">@(d.Total > 0 ? Fmt.Q(d.Total).Replace("Q ", "Q") : "")</span>
+                                <span class="pv-barra-relleno" style="height:@Altura(d.Total)%"></span>
+                                <span class="pv-barra-etiqueta">@d.Fecha.ToString("dd/MM")</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="pv-card h-100">
+                <div class="pv-card-header fw-semibold"><i class="bi bi-trophy me-2"></i>Productos más vendidos</div>
+                <ul class="list-group list-group-flush">
+                    @foreach (var (p, i) in _resumen.MasVendidos.Select((p, i) => (p, i)))
+                    {
+                        <li class="list-group-item d-flex align-items-center gap-3">
+                            <span class="badge rounded-pill text-bg-primary">@(i + 1)</span>
+                            <span class="flex-grow-1 text-truncate">@p.Producto</span>
+                            <span class="small text-secondary">@p.Unidades u.</span>
+                            <strong class="small">@Fmt.Q(p.Total)</strong>
+                        </li>
+                    }
+                    @if (_resumen.MasVendidos.Count == 0)
+                    {
+                        <li class="list-group-item text-secondary small">Aún no hay ventas.</li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private ResumenDto? _resumen;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _resumen = await Api.GetAsync<ResumenDto>("api/reportes/resumen"); }
+        catch (ApiException ex) { _error = ex.Message; }
+    }
+
+    private double Altura(decimal total)
+    {
+        var max = _resumen!.UltimosDias.Max(d => d.Total);
+        return max <= 0 ? 2 : Math.Max(2, (double)(total / max) * 100);
+    }
+}
