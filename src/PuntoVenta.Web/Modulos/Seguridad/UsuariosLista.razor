@@ -1,0 +1,196 @@
+@page "/usuarios"
+@attribute [Authorize(Roles = "Administrador")]
+@inject ApiService Api
+@inject NotificacionService Notificar
+@inject ConfirmacionService Confirmar
+
+<PageTitle>Usuarios · Punto de Venta</PageTitle>
+
+<EncabezadoPagina Titulo="Usuarios" Icono="bi-person-lock" Descripcion="Cuentas para iniciar sesión. El rol define las opciones del menú dinámico.">
+    <Acciones>
+        <button class="btn btn-primary" @onclick="Nuevo"><i class="bi bi-plus-lg me-1"></i>Nuevo usuario</button>
+    </Acciones>
+</EncabezadoPagina>
+
+<div class="pv-card">
+    <div class="pv-card-header d-flex flex-wrap gap-2 align-items-center">
+        <div class="pv-ancho-buscador"><Buscador Placeholder="Buscar por usuario o rol..." AlBuscar="Buscar" /></div>
+        <span class="ms-auto small text-secondary">@(_lista?.Count ?? 0) registros</span>
+    </div>
+
+    @if (_lista is null)
+    {
+        <Cargando />
+    }
+    else if (_lista.Count == 0)
+    {
+        <EstadoVacio Icono="bi-person-lock" Texto="No se encontraron usuarios." />
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr><th>Usuario</th><th>Empleado</th><th>Rol</th><th class="text-center">Estado</th><th>Creado</th><th class="text-end">Acciones</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var u in _lista)
+                    {
+                        <tr>
+                            <td class="fw-semibold"><i class="bi bi-person-circle me-2 text-secondary"></i>@u.Usuario</td>
+                            <td>@NombreEmpleado(u.IdEmpleado)</td>
+                            <td><span class="badge @(u.Rol == "Administrador" ? "text-bg-dark" : "text-bg-primary-subtle text-primary-emphasis")">@u.Rol</span></td>
+                            <td class="text-center">
+                                <span class="badge @(u.Activo ? "text-bg-success" : "text-bg-secondary")">@(u.Activo ? "Activo" : "Inactivo")</span>
+                            </td>
+                            <td class="small text-nowrap">@Fmt.Fecha(u.FechaIngreso)</td>
+                            <td class="text-end text-nowrap">
+                                <button class="btn btn-sm btn-outline-primary" title="Editar" @onclick="() => Editar(u)"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-danger" title="Eliminar" @onclick="() => Eliminar(u)"><i class="bi bi-trash"></i></button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<Modal @bind-Visible="_modal" Titulo="@(_actual.IdUsuario == 0 ? "Nuevo usuario" : "Editar usuario")" Icono="bi-person-lock">
+    <ChildContent>
+        <AlertaErrores Error="_error" />
+        <EditForm id="frmUsuario" Model="_actual" OnValidSubmit="Guardar">
+            <DataAnnotationsValidator />
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="usuario">Usuario *</label>
+                    <InputText id="usuario" class="form-control" @bind-Value="_actual.Usuario" maxlength="30" autocomplete="off" />
+                    <ValidationMessage For="() => _actual.Usuario" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="password">Contraseña @(_actual.IdUsuario == 0 ? "*" : "")</label>
+                    <InputText id="password" type="password" class="form-control" @bind-Value="_actual.Password" autocomplete="new-password"
+                               placeholder="@(_actual.IdUsuario == 0 ? "Mínimo 8 caracteres" : "Dejar vacía para no cambiar")" />
+                    <ValidationMessage For="() => _actual.Password" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="empleado">Empleado</label>
+                    <InputSelect id="empleado" class="form-select" @bind-Value="_actual.IdEmpleado">
+                        <option value="">-- Sin empleado --</option>
+                        @foreach (var e in _empleados)
+                        {
+                            <option value="@e.Id">@e.Texto</option>
+                        }
+                    </InputSelect>
+                    <div class="form-text">El empleado se usa por defecto al registrar ventas.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="rol">Rol *</label>
+                    <InputSelect id="rol" class="form-select" @bind-Value="_actual.IdRol">
+                        <option value="0">-- Seleccione --</option>
+                        @foreach (var r in _roles)
+                        {
+                            <option value="@r.Id">@r.Texto</option>
+                        }
+                    </InputSelect>
+                    <ValidationMessage For="() => _actual.IdRol" />
+                </div>
+                <div class="col-12">
+                    <div class="form-check form-switch">
+                        <InputCheckbox id="activo" class="form-check-input" @bind-Value="_actual.Activo" />
+                        <label class="form-check-label" for="activo">Usuario activo (puede iniciar sesión)</label>
+                    </div>
+                </div>
+            </div>
+        </EditForm>
+    </ChildContent>
+    <Pie>
+        <button class="btn btn-light" @onclick="() => _modal = false">Cancelar</button>
+        <button type="submit" form="frmUsuario" class="btn btn-primary" disabled="@_guardando"><i class="bi bi-check2 me-1"></i>Guardar</button>
+    </Pie>
+</Modal>
+
+@code {
+    private List<UsuarioDto>? _lista;
+    private List<OpcionDto> _roles = [], _empleados = [];
+    private UsuarioDto _actual = new();
+    private ApiException? _error;
+    private string _buscar = string.Empty;
+    private bool _modal, _guardando;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _roles = await Api.GetAsync<List<OpcionDto>>("api/usuarios/roles") ?? [];
+            _empleados = await Api.GetAsync<List<OpcionDto>>("api/empleados/opciones") ?? [];
+        }
+        catch (ApiException ex) { Notificar.Error(ex.Message); }
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        try { _lista = await Api.GetAsync<List<UsuarioDto>>($"api/usuarios?buscar={Uri.EscapeDataString(_buscar)}") ?? []; }
+        catch (ApiException ex) { Notificar.Error(ex.Message); _lista = []; }
+    }
+
+    private Task Buscar(string texto)
+    {
+        _buscar = texto;
+        return Cargar();
+    }
+
+    private string NombreEmpleado(int? id) =>
+        id is null ? "-" : _empleados.FirstOrDefault(e => e.Id == id)?.Texto ?? $"#{id}";
+
+    private void Nuevo()
+    {
+        _actual = new UsuarioDto { IdRol = (short)(_roles.LastOrDefault()?.Id ?? 0) };
+        _error = null;
+        _modal = true;
+    }
+
+    private void Editar(UsuarioDto u)
+    {
+        _actual = new UsuarioDto { IdUsuario = u.IdUsuario, Usuario = u.Usuario, IdEmpleado = u.IdEmpleado, IdRol = u.IdRol, Activo = u.Activo };
+        _error = null;
+        _modal = true;
+    }
+
+    private async Task Guardar()
+    {
+        if (_actual.IdUsuario == 0 && string.IsNullOrEmpty(_actual.Password))
+        {
+            _error = new ApiException("La contraseña es obligatoria para un usuario nuevo.", System.Net.HttpStatusCode.BadRequest);
+            return;
+        }
+
+        _guardando = true; _error = null;
+        try
+        {
+            if (_actual.IdUsuario == 0)
+                await Api.PostAsync("api/usuarios", _actual);
+            else
+                await Api.PutAsync($"api/usuarios/{_actual.IdUsuario}", _actual);
+
+            Notificar.Exito($"Usuario '{_actual.Usuario}' guardado.");
+            _modal = false;
+            await Cargar();
+        }
+        catch (ApiException ex) { _error = ex; }
+        finally { _guardando = false; }
+    }
+
+    private async Task Eliminar(UsuarioDto u)
+    {
+        if (!await Confirmar.PreguntarAsync("Eliminar usuario", $"¿Eliminar el usuario '{u.Usuario}'?")) return;
+        try
+        {
+            await Api.DeleteAsync($"api/usuarios/{u.IdUsuario}");
+            Notificar.Exito("Usuario eliminado.");
+            await Cargar();
+        }
+        catch (ApiException ex) { Notificar.Error(ex.Message); }
+    }
+}

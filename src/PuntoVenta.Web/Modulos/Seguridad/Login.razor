@@ -1,0 +1,118 @@
+@page "/login"
+@layout LoginLayout
+@attribute [AllowAnonymous]
+@inject ApiService Api
+@inject JwtAuthStateProvider Auth
+@inject NavigationManager Nav
+
+<PageTitle>Iniciar sesión · Punto de Venta</PageTitle>
+
+<div class="pv-login-card card border-0 shadow-lg">
+    <div class="card-body p-4 p-md-5">
+        <div class="text-center mb-4">
+            <span class="pv-logo pv-logo-lg mb-3"><i class="bi bi-shop-window"></i></span>
+            <h1 class="h4 fw-bold mb-1">Punto de Venta</h1>
+            <p class="text-secondary small mb-0">Ingrese sus credenciales para continuar</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger d-flex align-items-center gap-2 py-2" role="alert">
+                <i class="bi bi-exclamation-circle"></i><span>@_error</span>
+            </div>
+        }
+
+        <EditForm Model="_datos" OnValidSubmit="Ingresar" FormName="login">
+            <DataAnnotationsValidator />
+
+            <div class="mb-3">
+                <label class="form-label" for="usuario">Usuario</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-person"></i></span>
+                    <InputText id="usuario" class="form-control" @bind-Value="_datos.Usuario"
+                               autocomplete="username" placeholder="ej. admin" />
+                </div>
+                <ValidationMessage For="() => _datos.Usuario" class="text-danger small" />
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label" for="password">Contraseña</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                    <InputText id="password" type="@(_verPassword ? "text" : "password")" class="form-control"
+                               @bind-Value="_datos.Password" autocomplete="current-password" />
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => _verPassword = !_verPassword"
+                            title="@(_verPassword ? "Ocultar" : "Mostrar") contraseña">
+                        <i class="bi @(_verPassword ? "bi-eye-slash" : "bi-eye")"></i>
+                    </button>
+                </div>
+                <ValidationMessage For="() => _datos.Password" class="text-danger small" />
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-2" disabled="@_procesando">
+                @if (_procesando)
+                {
+                    <span class="spinner-border spinner-border-sm me-2"></span><span>Validando...</span>
+                }
+                else
+                {
+                    <i class="bi bi-box-arrow-in-right me-2"></i><span>Iniciar sesión</span>
+                }
+            </button>
+        </EditForm>
+
+        <div class="text-center mt-4">
+            <EstadoServidor />
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? Volver { get; set; }
+
+    private readonly LoginDto _datos = new();
+    private bool _procesando;
+    private bool _verPassword;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Si ya tiene sesión válida, no mostrar el login
+        var estado = await Auth.GetAuthenticationStateAsync();
+        if (estado.User.Identity?.IsAuthenticated == true)
+            Nav.NavigateTo(DestinoSeguro());
+    }
+
+    private async Task Ingresar()
+    {
+        _procesando = true;
+        _error = null;
+        try
+        {
+            // POST /api/auth/login → la API valida y devuelve el JWT
+            var respuesta = await Api.PostPublicoAsync<LoginDto, LoginRespuestaDto>("api/auth/login", _datos);
+            if (respuesta is null || string.IsNullOrEmpty(respuesta.Token))
+            {
+                _error = "La API no devolvió un token válido.";
+                return;
+            }
+
+            await Auth.IniciarSesionAsync(respuesta.Token);
+            Nav.NavigateTo(DestinoSeguro());
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _procesando = false;
+        }
+    }
+
+    /// <summary>Solo rutas internas de la aplicación (evita redirecciones a otros sitios).</summary>
+    private string DestinoSeguro() =>
+        string.IsNullOrWhiteSpace(Volver) || Volver.Contains("://") || Volver.StartsWith("//") || Volver.StartsWith("login")
+            ? ""
+            : Volver;
+}

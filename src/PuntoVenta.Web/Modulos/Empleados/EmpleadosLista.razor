@@ -1,0 +1,238 @@
+@page "/empleados"
+@inject ApiService Api
+@inject NotificacionService Notificar
+@inject ConfirmacionService Confirmar
+
+<PageTitle>Empleados · Punto de Venta</PageTitle>
+
+<EncabezadoPagina Titulo="Empleados" Icono="bi-person-badge" Descripcion="Personal de la empresa y su puesto de trabajo.">
+    <Acciones>
+        <a class="btn btn-outline-secondary" href="puestos"><i class="bi bi-diagram-3 me-1"></i>Administrar puestos</a>
+        <button class="btn btn-primary" @onclick="Nuevo"><i class="bi bi-plus-lg me-1"></i>Nuevo empleado</button>
+    </Acciones>
+</EncabezadoPagina>
+
+<div class="pv-card">
+    <div class="pv-card-header d-flex flex-wrap gap-2 align-items-center">
+        <div class="pv-ancho-buscador"><Buscador Placeholder="Buscar por nombre, DPI, teléfono o puesto..." AlBuscar="Buscar" /></div>
+        <select class="form-select w-auto" @bind="_filtroPuesto" @bind:after="Cargar" aria-label="Filtrar por puesto">
+            <option value="0">Todos los puestos</option>
+            @foreach (var p in _puestos)
+            {
+                <option value="@p.Id">@p.Texto</option>
+            }
+        </select>
+        <span class="ms-auto small text-secondary">@(_lista?.Count ?? 0) registros</span>
+    </div>
+
+    @if (_lista is null)
+    {
+        <Cargando />
+    }
+    else if (_lista.Count == 0)
+    {
+        <EstadoVacio Icono="bi-person-badge" Texto="No se encontraron empleados." />
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr><th>Empleado</th><th>DPI</th><th>Puesto</th><th>Teléfono</th><th>Inicio de labores</th><th class="text-end">Acciones</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var e in _lista.Skip((_pagina - 1) * TamanoPagina).Take(TamanoPagina))
+                    {
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">@e.NombreCompleto</div>
+                                <div class="small text-secondary">@(e.Genero ? "Masculino" : "Femenino") · @Edad(e.FechaNacimiento) años</div>
+                            </td>
+                            <td class="text-nowrap">@e.Dpi</td>
+                            <td><span class="badge text-bg-primary-subtle text-primary-emphasis">@e.Puesto</span></td>
+                            <td class="text-nowrap">@e.Telefono</td>
+                            <td>@Fmt.Fecha(e.FechaInicioLabores)</td>
+                            <td class="text-end text-nowrap">
+                                <button class="btn btn-sm btn-outline-primary" title="Editar" @onclick="() => Editar(e)"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-danger" title="Eliminar" @onclick="() => Eliminar(e)"><i class="bi bi-trash"></i></button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <Paginacion Total="_lista.Count" @bind-Pagina="_pagina" TamanoPagina="TamanoPagina" />
+    }
+</div>
+
+<Modal @bind-Visible="_modal" Titulo="@(_actual.IdEmpleado == 0 ? "Nuevo empleado" : "Editar empleado")" Icono="bi-person-badge">
+    <ChildContent>
+        <AlertaErrores Error="_error" />
+        <EditForm id="frmEmpleado" Model="_actual" OnValidSubmit="Guardar">
+            <DataAnnotationsValidator />
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="nombres">Nombres *</label>
+                    <InputText id="nombres" class="form-control" @bind-Value="_actual.Nombres" maxlength="60" />
+                    <ValidationMessage For="() => _actual.Nombres" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="apellidos">Apellidos *</label>
+                    <InputText id="apellidos" class="form-control" @bind-Value="_actual.Apellidos" maxlength="60" />
+                    <ValidationMessage For="() => _actual.Apellidos" />
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label" for="direccion">Dirección *</label>
+                    <InputText id="direccion" class="form-control" @bind-Value="_actual.Direccion" maxlength="80" />
+                    <ValidationMessage For="() => _actual.Direccion" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="telefono">Teléfono *</label>
+                    <InputText id="telefono" class="form-control" @bind-Value="_actual.Telefono" maxlength="25" placeholder="5512-3456" />
+                    <ValidationMessage For="() => _actual.Telefono" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="dpi">DPI *</label>
+                    <InputText id="dpi" class="form-control" @bind-Value="_actual.Dpi" maxlength="13" inputmode="numeric" placeholder="13 dígitos" />
+                    <ValidationMessage For="() => _actual.Dpi" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label d-block">Género *</label>
+                    <InputRadioGroup TValue="bool" @bind-Value="_actual.Genero">
+                        <div class="form-check form-check-inline mt-1">
+                            <InputRadio TValue="bool" Value="true" class="form-check-input" id="gM" />
+                            <label class="form-check-label" for="gM">Masculino</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <InputRadio TValue="bool" Value="false" class="form-check-input" id="gF" />
+                            <label class="form-check-label" for="gF">Femenino</label>
+                        </div>
+                    </InputRadioGroup>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="nacimiento">Fecha de nacimiento *</label>
+                    <InputDate id="nacimiento" class="form-control" @bind-Value="_actual.FechaNacimiento" />
+                    <ValidationMessage For="() => _actual.FechaNacimiento" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="inicio">Inicio de labores *</label>
+                    <InputDate id="inicio" class="form-control" @bind-Value="_actual.FechaInicioLabores" />
+                    <ValidationMessage For="() => _actual.FechaInicioLabores" />
+                </div>
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-end">
+                        <label class="form-label" for="puesto">Puesto *</label>
+                        <a class="small mb-2" href="puestos"><i class="bi bi-box-arrow-up-right me-1"></i>Ir al mantenimiento de Puestos</a>
+                    </div>
+                    <InputSelect id="puesto" class="form-select" @bind-Value="_actual.IdPuesto">
+                        <option value="0">-- Seleccione un puesto --</option>
+                        @foreach (var p in _puestos)
+                        {
+                            <option value="@p.Id">@p.Texto</option>
+                        }
+                    </InputSelect>
+                    <ValidationMessage For="() => _actual.IdPuesto" />
+                </div>
+            </div>
+        </EditForm>
+    </ChildContent>
+    <Pie>
+        <button class="btn btn-light" @onclick="() => _modal = false">Cancelar</button>
+        <button type="submit" form="frmEmpleado" class="btn btn-primary" disabled="@_guardando">
+            <i class="bi bi-check2 me-1"></i>Guardar
+        </button>
+    </Pie>
+</Modal>
+
+@code {
+    private const int TamanoPagina = 10;
+    private List<EmpleadoDto>? _lista;
+    private List<OpcionDto> _puestos = [];
+    private EmpleadoDto _actual = new();
+    private ApiException? _error;
+    private string _buscar = string.Empty;
+    private int _filtroPuesto;
+    private int _pagina = 1;
+    private bool _modal, _guardando;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _puestos = await Api.GetAsync<List<OpcionDto>>("api/puestos/opciones") ?? []; }
+        catch (ApiException ex) { Notificar.Error(ex.Message); }
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        _pagina = 1;
+        try
+        {
+            var url = $"api/empleados?buscar={Uri.EscapeDataString(_buscar)}" + (_filtroPuesto > 0 ? $"&idPuesto={_filtroPuesto}" : "");
+            _lista = await Api.GetAsync<List<EmpleadoDto>>(url) ?? [];
+        }
+        catch (ApiException ex) { Notificar.Error(ex.Message); _lista = []; }
+    }
+
+    private Task Buscar(string texto)
+    {
+        _buscar = texto;
+        return Cargar();
+    }
+
+    private void Nuevo()
+    {
+        _actual = new EmpleadoDto { FechaInicioLabores = DateOnly.FromDateTime(DateTime.Today) };
+        _error = null;
+        _modal = true;
+    }
+
+    private void Editar(EmpleadoDto e)
+    {
+        _actual = new EmpleadoDto
+        {
+            IdEmpleado = e.IdEmpleado, Nombres = e.Nombres, Apellidos = e.Apellidos, Direccion = e.Direccion,
+            Telefono = e.Telefono, Dpi = e.Dpi, Genero = e.Genero, FechaNacimiento = e.FechaNacimiento,
+            IdPuesto = e.IdPuesto, FechaInicioLabores = e.FechaInicioLabores
+        };
+        _error = null;
+        _modal = true;
+    }
+
+    private async Task Guardar()
+    {
+        _guardando = true; _error = null;
+        try
+        {
+            if (_actual.IdEmpleado == 0)
+                await Api.PostAsync("api/empleados", _actual);
+            else
+                await Api.PutAsync($"api/empleados/{_actual.IdEmpleado}", _actual);
+
+            Notificar.Exito($"Empleado {_actual.NombreCompleto} guardado.");
+            _modal = false;
+            await Cargar();
+        }
+        catch (ApiException ex) { _error = ex; }
+        finally { _guardando = false; }
+    }
+
+    private async Task Eliminar(EmpleadoDto e)
+    {
+        if (!await Confirmar.PreguntarAsync("Eliminar empleado", $"¿Desea eliminar a {e.NombreCompleto}?")) return;
+        try
+        {
+            await Api.DeleteAsync($"api/empleados/{e.IdEmpleado}");
+            Notificar.Exito("Empleado eliminado.");
+            await Cargar();
+        }
+        catch (ApiException ex) { Notificar.Error(ex.Message); }
+    }
+
+    private static int Edad(DateOnly? nacimiento)
+    {
+        if (nacimiento is null) return 0;
+        var hoy = DateOnly.FromDateTime(DateTime.Today);
+        var edad = hoy.Year - nacimiento.Value.Year;
+        return nacimiento.Value.AddYears(edad) > hoy ? edad - 1 : edad;
+    }
+}
